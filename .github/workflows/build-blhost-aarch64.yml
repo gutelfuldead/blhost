@@ -49,10 +49,10 @@ jobs:
         run: |
           docker create --platform linux/arm64 --name extract blhost:aarch64
 
-      - name: Copy blhost binary from container
-        run: |
-          docker cp extract:/usr/local/bin/blhost ./blhost-aarch64
-          docker rm extract
+	  - name: Copy blhost binary from container
+		run: |
+		  docker cp extract:/blhost/validation/blhost/gcc/Release/blhost ./blhost-aarch64
+		  docker rm extract
 
       - name: Upload blhost binary as artifact
         uses: actions/upload-artifact@v4
