@@ -45,6 +45,21 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
 
+      - name: Create container from built image
+        run: |
+          docker create --platform linux/arm64 --name extract blhost:aarch64
+
+      - name: Copy blhost binary from container
+        run: |
+          docker cp extract:/usr/local/bin/blhost ./blhost-aarch64
+          docker rm extract
+
+      - name: Upload blhost binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blhost-aarch64
+          path: ./blhost-aarch64
+
       - name: Move cache (persist between builds)
         run: |
           rm -rf /tmp/.buildx-cache
