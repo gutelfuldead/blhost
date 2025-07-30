@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
-WORKDIR /lauszus-blhost
+WORKDIR /blhost
 
 # Copy source
 COPY . .
@@ -20,4 +20,3 @@ COPY . .
 # Build the blhost binary
 RUN make -C tools/blhost/gcc -j1 && \
     strip tools/blhost/gcc/Release/blhost
-
