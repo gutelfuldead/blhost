@@ -36,7 +36,7 @@ jobs:
 
       - name: Find compiled binary path (debug)
         run: |
-		  docker run --rm --platform linux/arm64 blhost:aarch64 find /lauszus-blhost -type f -name 'blhost' -exec ls -lh {} \;
+          docker run --rm --platform linux/arm64 blhost:aarch64 find /lauszus-blhost -type f -name 'blhost' -exec ls -lh {} \;
 
       - name: Copy blhost binary from container
         run: |
