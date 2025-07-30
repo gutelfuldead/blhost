@@ -90,7 +90,7 @@ SOURCES := $(BOOT_ROOT)/tools/blhost/src/blhost.cpp \
 ifeq "$(machine)" "X86_64"
 LIBS += $(BOOT_ROOT)/src/middleware/libusbsio/bin/linux/amd64/libusbsio.a
 else
-LIBS += $(BOOT_ROOT)/src/middleware/libusbsio/bin/linux/i386/libusbsio.a
+LIBS += $(BOOT_ROOT)/src/middleware/libusbsio/bin/linux/aarch64/libusbsio.a
 endif
 
 INCLUDES := $(foreach includes, $(INCLUDES), -I $(includes))
