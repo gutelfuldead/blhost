@@ -696,6 +696,11 @@ end_of_function:
     return bytes_written;
 }
 
+int HID_API_EXPORT HID_API_CALL hid_write(hid_device *dev, const unsigned char *data, size_t length)
+{
+    return hid_write_timeout(dev, data, length, (dev->blocking) ? -1 : 0);
+}
+
 int HID_API_EXPORT HID_API_CALL hid_read_timeout(hid_device *dev, unsigned char *data, size_t length, int milliseconds)
 {
     DWORD bytes_read = 0;

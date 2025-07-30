@@ -1,45 +1,22 @@
 /*
- * Copyright (c) 2013-14, Freescale Semiconductor, Inc.
+ * Copyright (c) 2013-2014 Freescale Semiconductor, Inc.
+ * Copyright 2015-2020 NXP.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
  *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "blfwk/SerialPacketizer.h"
 #include "blfwk/Logging.h"
+#include "blfwk/SerialPacketizer.h"
 #include "blfwk/utils.h"
-#include "bootloader/bootloader.h"
 #include "crc/crc16.h"
-#ifdef WIN32
+#if defined(WIN32)
 #include <windows.h>
 #endif
 #if defined(LINUX) || defined(MACOSX)
 #include <string.h>
 #include <unistd.h>
-#include <sys/time.h>
 #endif
 
 using namespace blfwk;
@@ -71,8 +48,8 @@ const ping_response_t k_PingResponse = {
 ////////////////////////////////////////////////////////////////////////////////
 
 // See SerialPacketizer.h for documentation of this method.
-SerialPacketizer::SerialPacketizer(UartPeripheral *peripheral, uint32_t packetTimeoutMs)
-    : Packetizer(dynamic_cast<Peripheral *>(peripheral), packetTimeoutMs)
+SerialPacketizer::SerialPacketizer(Peripheral *peripheral, uint32_t packetTimeoutMs)
+    : Packetizer(peripheral, packetTimeoutMs)
 {
     // Clear the initial serial context
     memset(&m_serialContext, 0, sizeof(m_serialContext));
@@ -126,28 +103,25 @@ void SerialPacketizer::host_delay(uint32_t milliseconds)
 // @todo implement for non-win32
 #if defined(WIN32)
     Sleep(milliseconds);
-#else
+#elif defined(LINUX) || defined(MACOSX)
     usleep(milliseconds * 1000);
 #endif
 }
 
-#if defined(LINUX) || defined(MACOSX)
-uint64_t current_timestamp()
-{
-    struct timeval te;
-    gettimeofday(&te, NULL); // Get current time
-    uint64_t milliseconds = te.tv_sec*1000LL + te.tv_usec/1000; // Calculate milliseconds
-    return milliseconds;
-}
-#endif
-
 // See SerialPacketizer.h for documentation of this method.
-status_t SerialPacketizer::ping(int retries, unsigned int delay, ping_response_t *pingResponse, int comSpeed)
+status_t SerialPacketizer::ping(
+    int retries, unsigned int delay, ping_response_t *pingResponse, int comSpeed, int *actualComSpeed)
 {
     status_t status = kStatus_NoPingResponse;
     uint8_t startByte = 0;
     uint32_t bytesRead = 0;
     const int initialRetries = retries;
+    static bool retryDoubledBaudrate = true;
+
+    if (actualComSpeed != NULL)
+    {
+        *actualComSpeed = comSpeed;
+    }
 
     framing_header_t pingPacket;
     pingPacket.startByte = kFramingPacketStartByte;
@@ -163,8 +137,9 @@ status_t SerialPacketizer::ping(int retries, unsigned int delay, ping_response_t
             double duration = 0.0;
 #if defined(WIN32)
             clock_t start = clock();
-#else
-            uint64_t start = current_timestamp();
+#else //#elif defined(LINUX) || defined(MACOSX)
+            struct timespec start;
+            clock_gettime(CLOCK_REALTIME, &start);
 #endif
 
             // Try for half a second to get a response from the ping.
@@ -180,10 +155,15 @@ status_t SerialPacketizer::ping(int retries, unsigned int delay, ping_response_t
                 }
 
                 host_delay(kReadDelayMilliseconds);
+
 #if defined(WIN32)
-                duration = (double)(clock() - start) / CLOCKS_PER_SEC; // Windows: CLOCKS_PER_SEC = 1,000.
-#else
-                duration = (double)(current_timestamp() - start) / 1000.0; // Linux and Mac
+                // Windows: CLOCKS_PER_SEC = 1,000, Linux & MACOSX: CLOCKS_PER_SEC = 1,000,000.
+                duration = (double)(clock() - start) / CLOCKS_PER_SEC;
+#else //#elif defined(LINUX) || defined(MACOSX)
+                struct timespec current;
+                clock_gettime(CLOCK_REALTIME, &current);
+                duration =
+                    (double)(current.tv_sec - start.tv_sec) + (double)(current.tv_nsec - start.tv_nsec) / 1000000000;
 #endif
             }
 
@@ -407,7 +387,7 @@ void SerialPacketizer::serial_packet_abort()
 // See SerialPacketizer.h for documentation on this function.
 uint32_t SerialPacketizer::serial_packet_get_max_packet_size()
 {
-    return kMinPacketBufferSize;
+    return kMaxHostPacketSize;
 }
 
 // See SerialPacketizer.h for documentation on this function.
@@ -551,7 +531,12 @@ status_t SerialPacketizer::read_data_packet(framing_data_packet_t *packet, uint8
     }
 
     // Make sure the packet doesn't exceed the allocated buffer size.
-    packet->length = MIN(kIncomingPacketBufferSize, packet->length);
+    if (packet->length > getMaxPacketSize())
+    {
+        Log::error("Error: Data packet size(%d) is bigger than max supported size(%d)\r\n", packet->length,
+                   getMaxPacketSize());
+        return kStatus_Fail;
+    }
 
     // Read the crc
     status = read_crc16(packet);
@@ -577,11 +562,7 @@ status_t SerialPacketizer::read_start_byte(framing_header_t *header)
 {
     double timeout = (double)m_packetTimeoutMs / 1000;
     double duration = 0.0;
-#if defined(WIN32)
     clock_t start = clock();
-#else
-    uint64_t start = current_timestamp();
-#endif
 
     // Read until start byte found.
     while (duration < timeout)
@@ -593,9 +574,12 @@ status_t SerialPacketizer::read_start_byte(framing_header_t *header)
             return status;
         }
 
-        if (header->startByte == kFramingPacketStartByte)
+        if (status == kStatus_Success)
         {
-            return kStatus_Success;
+            if (header->startByte == kFramingPacketStartByte)
+            {
+                return kStatus_Success;
+            }
         }
 
         // This will keep us from doing non necessary delays in case the byte received
@@ -604,11 +588,8 @@ status_t SerialPacketizer::read_start_byte(framing_header_t *header)
         // that may take several seconds to complete.
         host_delay(kDefaultByteReadTimeoutMs);
 
-#if defined(WIN32)
-        duration = (double)(clock() - start) / CLOCKS_PER_SEC; // Windows: CLOCKS_PER_SEC = 1,000.
-#else
-        duration = (double)(current_timestamp() - start) / 1000.0; // Linux and Mac
-#endif
+        // Windows: CLOCKS_PER_SEC = 1,000, Linux & MACOSX: CLOCKS_PER_SEC = 1,000,000.
+        duration = (double)(clock() - start) / CLOCKS_PER_SEC;
     }
 
     Log::error("Error: read_start_byte() timeout after %2.3f seconds\n", duration);

@@ -1,31 +1,9 @@
 /*
- * Copyright (c) 2013-14, Freescale Semiconductor, Inc.
+ * Copyright (c) 2013-2014 Freescale Semiconductor, Inc.
+ * Copyright 2015-2020 NXP.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 #if !defined(_Updater_h_)
 #define _Updater_h_
@@ -162,7 +140,7 @@ struct updater_operation_t
  * firmware on a device running Bootloader.
  *
  * The purpose of this class is to provide a common interface for
- * updating any device running the Kinetis Bootloader from several different file formats.
+ * updating any device running the Bootloader from several different file formats.
  */
 class Updater : public Bootloader
 {
@@ -175,6 +153,7 @@ public:
 
     //! \name Update API.
     //@{
+
     //! @brief Type for the progress callback routine.
     typedef void (*progress_callback_t)(updater_operation_t *op);
 
@@ -200,7 +179,7 @@ public:
     //!
     //! \param  filename       The file to program into the device.
     //! \param  base_address   The address on the device where the file wiill be written.
-    status_t flashFirmware(const char *filename, uint32_t base_address);
+    status_t flashFirmware(const char *filename, uint32_t base_address, uint32_t memoryId);
 
     //! \brief Erase all flash blocks and release MCU security
     //!
@@ -209,6 +188,24 @@ public:
     //!                                  Raised if the FlashEraseAllUnsecure command is not
     //!                                  supported.
     void eraseAllUnsecure();
+
+    //! \brief Erase the specified FLASH region.
+    //!
+    //! \exception  std::runtime_error  Thrown if an error occurred.
+    //!
+    //! \param  start   The beginning address of the memory region to be erased.
+    //!
+    //! \param  length  The length in bytes of the memory region to be erased.
+    //!
+    //! \param  memoryId  The ID of the memory to erase.
+    void eraseRegion(uint32_t start, uint32_t length, uint32_t memoryId);
+
+    //! \brief Execute the FlashEraseAll bootloader command.
+    //!
+    //! \exception  std::runtime_error  Thrown if an error occurred
+    //!
+    //! \param  memoryId  The ID of the memory to erase.
+    void eraseAll(uint32_t memoryId);
 
     //! \brief Release security using BackdoorKey
     //!
@@ -220,36 +217,38 @@ public:
     //! \param backdoor_key     The 16 hex digitals used to release the security
     void unlock(string backdoor_key);
 
-    //! \brief Checks if Kinetis Bootloader device supports a given command.
+    //! \brief get total internal flash size of current device.
+    //!
+    //! \exception  std::runtime_error  Raised if the operation is failed.
+    //!
+    //! \return the size in bytes. Return 0 means no internal Flash available.
+    uint32_t getInternalFlashSize(void);
+
+    //! \brief get total internal RAM size of current device.
+    //!
+    //! \exception  std::runtime_error  Raised if the operation is failed.
+    //!
+    //! \return the size in bytes. Return 0 means no internal RAM available.
+    uint32_t getInternalRAMSize(void);
+
+    //! \brief Execute the FlashProgramOnce bootloader command.
     //!
     //! \exception  std::runtime_error  Thrown if an error occurred while sending the
-    //!                                 GetProperty(kProperty_AvailableCommands) bootloader command.
+    //!                                 FlashEraseAll bootloader command.
     //!
-    //! \param  command The command to check.
+    //! \param  index   The index of a specific program once field.
     //!
-    //! \return true if command is supported, false if not.
-    bool isCommandSupported(const cmd_t &command);
+    //! \param  byteCount  The length in bytes of a specific program once field.
+    //!
+    //! \param  data    The 8/16 hex digitals to write.
+    void programOnce(uint32_t index, uint32_t byteCount, string data, bool isLsb);
     //@}
     //
 
-    //! \brief get Device's property by using get-property command.
-    //!
-    //! \exception  std::runtime_error  Thrown if an error occurred while sending the
-    //!                                 GetProperty(property) bootloader command.
-    //!
-    //! \param  property tag
-    //!
-    //! \return vector of the response values.
-    uint32_vector_t getProperty(property_t tag);
+protected:
+    //! \name Bootloader commands
+    //@{
 
-    //! \brief get Device's flash sector size.
-    //!
-    //! \return the value of sector size.
-    uint32_t getSectorSize() { return m_sector_size; };
-    //! \brief get Device's flash size.
-    //!
-    //! \return the value of flash size.
-    uint32_t getFlshSize() { return m_flashSize; };
     //! \brief Execute the FlashEraseRegion bootloader command.
     //!
     //! \exception  std::runtime_error  Thrown if an error occurred while sending the
@@ -264,25 +263,7 @@ public:
     //!
     //! \exception  std::runtime_error  Thrown if an error occurred while sending the
     //!                                 FlashEraseAll bootloader command.
-    void eraseFlashAll(uint32_t memoryId);
-
-    //! \brief Execute the FlashProgramOnce bootloader command.
-    //!
-    //! \exception  std::runtime_error  Thrown if an error occurred while sending the
-    //!                                 FlashEraseAll bootloader command.
-    //!
-    //! \param  index   The index of a specific program once field.
-    //!
-    //! \param  byteCount  The length in bytes of a specific program once field.
-    //!
-    //! \param  data    The 8/16 hex digitals to write.
-    void programOnce(uint32_t index, uint32_t byteCount, string data);
-    //@}
-    //
-
-protected:
-    //! \name Bootloader commands
-    //@{
+    void eraseFlashAll();
 
     //! \brief Execute the write-memory bootloader command.
     //!
@@ -301,20 +282,39 @@ protected:
     //! \param [in] address The address on the device where the data will be written.
     void writeMemory(uint32_t address, const uchar_vector_t &data);
 
+    //! \brief Execute the write-memory bootloader command.
+    //!
+    //! \exception  std::runtime_error  Thrown if an error occurred while sending the
+    //!                                 WriteMemory(segment) bootloader command.
+    //!
+    //! \param [in,out] segment The DatSource::Segment that represents the data to be written to the device.
+    void fuseProgram(DataSource::Segment *segment);
+
+    //! \brief Execute the write-memory bootloader command.
+    //!
+    //! \exception  std::runtime_error  Thrown if an error occurred while sending the
+    //!                                 WriteMemory(vector<uint8_t) bootloader command.
+    //!
+    //! \param [in] data A vector<uchar> refernce that contains the data to be written to the device.
+    //! \param [in] address The address on the device where the data will be written.
+    void fuseProgram(uint32_t address, const uchar_vector_t &data);
+
     //! \brief Program flash procedure for SourceFile types.
     status_t flashFromSourceFile();
 
     //! \brief Program flash procedure for SB files.
     status_t flashFromSBFile(const char *filename);
 
+    //! \brief Check if the memory is supported by current device.
+    bool isMemorySupported(uint32_t memoryId);
+
 protected:
     uint32_t m_base_address;                //!< Base address of the image.
-    uint32_t m_sector_size;                 //!< Sector size of the flash on the device.
-    uint32_t m_flashStart;                  //!< Start address of the flash on the device.
-    uint32_t m_flashSize;                   //!< The flash size (in bytes) of the device.
     SourceFile *m_sourceFile;               //!< SourceFile object.
+    uint32_t m_memoryId;                    //!< ID of the memory to flush the image to.
     progress_callback_t m_progressCallback; //!< Callback used to report update progress.
     Progress m_progress;                    //!< Progress control.
+    standard_version_t m_version;           //!< Version of the bootloader running on current device.
 };
 
 }; // namespace blfwk

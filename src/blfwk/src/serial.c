@@ -1,33 +1,37 @@
 /*
-* This file is part of the Bus Pirate project (http://code.google.com/p/the-bus-pirate/).
-*
-* Written and maintained by the Bus Pirate project and http://dangerousprototypes.com
-*
-* To the extent possible under law, the project has
-* waived all copyright and related or neighboring rights to Bus Pirate. This
-* work is published from United States.
-*
-* For details see: http://creativecommons.org/publicdomain/zero/1.0/.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-*/
+ * This file is part of the Bus Pirate project (http://code.google.com/p/the-bus-pirate/).
+ *
+ * Written and maintained by the Bus Pirate project and http://dangerousprototypes.com
+ *
+ * To the extent possible under law, the project has
+ * waived all copyright and related or neighboring rights to Bus Pirate. This
+ * work is published from United States.
+ *
+ * For details see: http://creativecommons.org/publicdomain/zero/1.0/.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ */
 /*
-* OS independent serial interface
-*
-* Heavily based on Pirate-Loader:
-* http://the-bus-pirate.googlecode.com/svn/trunk/bootloader-v4/pirate-loader/source/pirate-loader.c
-*
-*/
+ * OS independent serial interface
+ *
+ * Heavily based on Pirate-Loader:
+ * http://the-bus-pirate.googlecode.com/svn/trunk/bootloader-v4/pirate-loader/source/pirate-loader.c
+ *
+ */
 
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <string.h>
 
 #include "blfwk/serial.h"
+
+#ifdef LINUX
+#include <termios.h>
+#endif
 
 int serial_setup(int fd, speed_t speed)
 {
@@ -37,10 +41,6 @@ int serial_setup(int fd, speed_t speed)
     HANDLE hCom = (HANDLE)fd;
 
     dcb.DCBlength = sizeof(dcb);
-    if (!GetCommState(hCom, &dcb))
-    {
-        return -1;
-    }
 
     dcb.BaudRate = speed;
     dcb.ByteSize = 8;
@@ -67,18 +67,20 @@ int serial_setup(int fd, speed_t speed)
         return -1;
     }
 
-#elif defined(LINUX)
+#elif defined(LINUX) || defined(MACOSX)
     struct termios tty;
-    int custom_speed = 0;
 
-    memset(&tty, 0, sizeof(tty));
+    memset(&tty, 0x00, sizeof(tty));
     cfmakeraw(&tty);
 
     tty.c_cflag &= ~(PARENB | CSTOPB | CSIZE);
-    tty.c_cflag |= (CS8 | CLOCAL | CREAD);
+    tty.c_cflag |= (CS8 | CLOCAL | CREAD | HUPCL);
     tty.c_oflag = 0;
     tty.c_lflag = 0;
 
+#if defined(LINUX)
+    // Non standard baud rates depend on the specific system.
+    // Only supports standard baud rates.
     switch (speed)
     {
         case 9600:
@@ -99,33 +101,54 @@ int serial_setup(int fd, speed_t speed)
         case 230400:
             speed = B230400;
             break;
+        case 460800:
+            speed = B460800;
+            break;
+        case 500000:
+            speed = B500000;
+            break;
+        case 576000:
+            speed = B576000;
+            break;
+        case 921600:
+            speed = B921600;
+            break;
+        case 1000000:
+            speed = B1000000;
+            break;
+        case 1152000:
+            speed = B1152000;
+            break;
+        case 1500000:
+            speed = B1500000;
+            break;
+        case 2000000:
+            speed = B2000000;
+            break;
+        case 2500000:
+            speed = B2500000;
+            break;
+        case 3000000:
+            speed = B3000000;
+            break;
+        case 3500000:
+            speed = B3500000;
+            break;
+        case 4000000:
+            speed = B4000000;
+            break;
         default:
-            custom_speed = 1;
+            printf("Warning: unsupported standard baud rate(%d), set to default(57600)\n", speed);
+            speed = B57600;
             break;
     }
-
-    if (custom_speed)
-    {
-        if (cfsetospeed_custom(&tty, speed) < 0)
-        {
-            return -1;
-        }
-        if (cfsetispeed_custom(&tty, speed) < 0)
-        {
-            return -1;
-        }
-    }
-    else
-    {
-        if (cfsetospeed(&tty, speed) < 0)
-        {
-            return -1;
-        }
-        if (cfsetispeed(&tty, speed) < 0)
-        {
-            return -1;
-        }
-    }
+    cfsetospeed(&tty, speed);
+    cfsetispeed(&tty, speed);
+#elif defined(MACOSX)
+    // Set a dummy speed here, the real speed will be set by IOSSIOSPEED
+    cfsetospeed(&tty, B57600);
+    cfsetispeed(&tty, B57600);
+#endif // LINUX
 
     // Completely non-blocking read
     // VMIN = 0 and VTIME = 0
@@ -139,25 +162,23 @@ int serial_setup(int fd, speed_t speed)
         return -1;
     }
 
-#elif defined(MACOSX)
-    struct termios tty;
-
-    memset(&tty, 0, sizeof(tty));
-
-    if (tcgetattr(fd, &tty) < 0)
+#if defined(MACOSX)
+    if (ioctl(fd, IOSSIOSPEED, &speed) == -1)
     {
         return -1;
     }
-
-    tty.c_cflag |= (CLOCAL | CREAD); // Enable local mode and serial data receipt
-
-    if (tcsetattr(fd, TCSAFLUSH, &tty) < 0)
-    {
-        return -1;
-    }
-
-    return ioctl(fd, IOSSIOSPEED, &speed);
+#endif // MACOSX
 #endif // WIN32
+
+#if defined(MAXOSX)
+    // Set the receive latency to 1us which is used by serial driver to determine how often to dequeue characters
+    // received by the hardware.
+    unsigned long us = 1UL;
+    if (ioctl(fd, IOSSDATALAT, &us) < 0)
+    {
+        return -1;
+    }
+#endif // MAXOSX
 
     return 0;
 }
@@ -204,13 +225,11 @@ int serial_set_read_timeout(int fd, uint32_t timeoutMs)
         return -1;
     }
 
-#elif defined(LINUX)
+#elif defined(LINUX) || defined(MAXOSX)
     struct termios tty;
 
-    if (tcgetattr(fd, &tty) < 0)
-    {
-        return -1;
-    }
+    memset(&tty, 0x00, sizeof(tty));
+    tcgetattr(fd, &tty);
 
     // Completely non-blocking read
     // VMIN = 0 and VTIME > 0
@@ -234,15 +253,8 @@ int serial_set_read_timeout(int fd, uint32_t timeoutMs)
         return -1;
     }
 
-#elif defined(MAXOSX)
-    // Setting tty.c_cc seems to hang up the serial driver on El Capitan,
-    // so now using IOSSDATALAT ioctl with timeout set to 1 us.
-    uint32_t us = 1UL;
-    if (ioctl(fd, IOSSDATALAT, &us) < 0)
-    {
-        return -1;
-    }
 #endif // WIN32
+
     return 0;
 }
 
@@ -296,12 +308,25 @@ int serial_read(int fd, char *buf, int size)
         {
             timeout++;
 
+#if defined(MACOSX)
+            // There is a huge gap every 32 bytes on some MACOS. So use an extremely large value to workaround it.
+            if (timeout >= 1000 * 1000)
+            {
+                break;
+            }
+#else
             if (timeout >= 10)
             {
                 break;
             }
+#endif
 
             continue;
+        }
+        else
+        {
+            // Reset the timeout, once data byte(s) is(are) received.
+            timeout = 0;
         }
 
         len += ret;
@@ -314,7 +339,7 @@ int serial_read(int fd, char *buf, int size)
 int serial_open(char *port)
 {
     int fd;
-#ifdef WIN32
+#if defined(WIN32)
     static char full_path[32] = { 0 };
 
     HANDLE hCom = NULL;
@@ -336,11 +361,27 @@ int serial_open(char *port)
     {
         fd = (int)hCom;
     }
-#else
-    fd = open(port, O_RDWR | O_NOCTTY | O_NDELAY);
+#elif defined(LINUX)
+    fd = open(port, O_RDWR | O_NOCTTY);
     if (fd == -1)
     {
-        fprintf(stderr, "Could not open serial port.");
+        fprintf(stderr, "Could not open serial port.\n");
+        return -1;
+    }
+#elif defined(MACOSX)
+    // There is an issue in some MACOS about the blocking operations for serial devices. So use non-blocking to avoid
+    // it.
+    fd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (fd == -1)
+    {
+        fprintf(stderr, "Could not open serial port.\n");
+        return -1;
+    }
+
+    // O_NONBLOCK is required for the OPEN operation. Clear the O_NONBLOCK flag, so subsequent operation will block.
+    if (fcntl(fd, F_SETFL, 0) == -1)
+    {
+        fprintf(stderr, "Failed to set non-blocking mode to the serial port.\n");
         return -1;
     }
 #endif

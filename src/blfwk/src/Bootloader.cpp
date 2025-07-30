@@ -1,43 +1,26 @@
 /*
- * Copyright (c) 2013-14, Freescale Semiconductor, Inc.
+ * Copyright (c) 2013-2014 Freescale Semiconductor, Inc.
+ * Copyright 2015-2020 NXP
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
  *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include "blfwk/Bootloader.h"
 #include "blfwk/BusPalPeripheral.h"
+#include "blfwk/LpcUsbSioPeripheral.h"
 #include "blfwk/SerialPacketizer.h"
 #include "blfwk/UartPeripheral.h"
+#if defined(LINUX) && defined(__ARM__)
+#include "blfwk/I2cPeripheral.h"
+#include "blfwk/SpiPeripheral.h"
+#endif
 #include "blfwk/UsbHidPacketizer.h"
 #include "blfwk/UsbHidPeripheral.h"
 #include "blfwk/format_string.h"
-#include "blfwk/utils.h"
 #include "blfwk/json.h"
-#include "packet/serial_packet.h"
+#include "blfwk/utils.h"
 
 using namespace blfwk;
 using namespace std;
@@ -92,7 +75,7 @@ Bootloader::Bootloader(const Peripheral::PeripheralConfigData &config)
                 // Send initial ping.
                 try
                 {
-                    ping(2, 1000, config.comPortSpeed); // Ping 3 times with a delay of 1 s between the ping commands
+                    ping(0, 0, config.comPortSpeed, NULL);
                 }
                 catch (const std::exception &e)
                 {
@@ -106,12 +89,64 @@ Bootloader::Bootloader(const Peripheral::PeripheralConfigData &config)
         }
         case Peripheral::kHostPeripheralType_USB_HID:
         {
-            UsbHidPeripheral *peripheral =
-                new UsbHidPeripheral(config.usbHidVid, config.usbHidPid, config.usbHidSerialNumber.c_str());
-            m_hostPacketizer = new UsbHidPacketizer(peripheral, config.packetTimeoutMs);
+            UsbHidPeripheral *peripheral = NULL;
+            try
+            {
+                peripheral = new UsbHidPeripheral(config.usbHidVid, config.usbHidPid, config.usbHidSerialNumber.c_str(),
+                                                  config.usbPath.c_str());
+                m_hostPacketizer = new UsbHidPacketizer(peripheral, config.packetTimeoutMs);
+            }
+            catch (...)
+            {
+                delete peripheral;
+                throw;
+            }
+            break;
+        }
+#if defined(LINUX) && defined(__ARM__)
+        case Peripheral::kHostPeripheralType_I2C:
+        {
+            I2cPeripheral *peripheral =
+                new I2cPeripheral(config.comPortName.c_str(), config.i2cAddress, config.comPortSpeed);
+            m_hostPacketizer = new SerialPacketizer(peripheral, config.packetTimeoutMs);
+
+            if (config.ping)
+            {
+                // Send initial ping.
+                try
+                {
+                    ping(0, 0, config.comPortSpeed, NULL);
+                }
+                catch (const std::exception &e)
+                {
+                    throw std::runtime_error(format_string("Error: Initial ping failure: %s", e.what()));
+                }
+            }
 
             break;
         }
+        case Peripheral::kHostPeripheralType_SPI:
+        {
+            SpiPeripheral *peripheral = new SpiPeripheral(config.comPortName.c_str(), config.comPortSpeed,
+                                                          config.spiPolarity, config.spiPhase, config.spiSequence);
+            m_hostPacketizer = new SerialPacketizer(peripheral, config.packetTimeoutMs);
+
+            if (config.ping)
+            {
+                // Send initial ping.
+                try
+                {
+                    ping(0, 0, config.comPortSpeed, NULL);
+                }
+                catch (const std::exception &e)
+                {
+                    throw std::runtime_error(format_string("Error: Initial ping failure: %s", e.what()));
+                }
+            }
+
+            break;
+        }
+#endif // #if defined(LINUX) && defined(__ARM__)
         case Peripheral::kHostPeripheralType_BUSPAL_UART:
         {
             BusPalUartPeripheral *peripheral =
@@ -130,7 +165,7 @@ Bootloader::Bootloader(const Peripheral::PeripheralConfigData &config)
 #endif
                 try
                 {
-                    ping(buspalReadRetries, 0, 0);
+                    ping(buspalReadRetries, 0, 0, NULL);
                 }
                 catch (const std::exception &e)
                 {
@@ -140,6 +175,30 @@ Bootloader::Bootloader(const Peripheral::PeripheralConfigData &config)
 
             break;
         }
+#if defined(LPCUSBSIO)
+        case Peripheral::kHostPeripheralType_LPCUSBSIO:
+        {
+            LpcUsbSioPeripheral *peripheral = new LpcUsbSioPeripheral(config.lpcUsbSioConfig);
+            m_hostPacketizer = new SerialPacketizer(peripheral, config.packetTimeoutMs);
+
+            if (config.ping)
+            {
+                // Send initial ping.
+                try
+                {
+                    ping(0, 0, 0, NULL);
+                }
+                catch (const std::exception &e)
+                {
+                    delete m_hostPacketizer;
+                    m_hostPacketizer = NULL;
+                    throw std::runtime_error(format_string("Error: Initial ping failure: %s", e.what()));
+                }
+            }
+
+            break;
+        }
+#endif // #if defined(LPCUSBSIO)
         default:
             throw std::runtime_error(format_string("Error: Unsupported peripheral type(%d).", config.peripheralType));
     }
@@ -151,8 +210,11 @@ Bootloader::~Bootloader()
     flush();
 
     // Delete packetizer should close handles and free memory on Peripheral.
-    delete m_hostPacketizer;
-    m_hostPacketizer = NULL;
+    if (m_hostPacketizer)
+    {
+        delete m_hostPacketizer;
+        m_hostPacketizer = NULL;
+    }
 }
 
 // See host_bootloader.h for documentation of this method.
@@ -201,13 +263,12 @@ void Bootloader::reset()
     }
 }
 
-// See host_bootloader.h for documentation of this method.
-standard_version_t Bootloader::getVersion()
+uint32_vector_t Bootloader::getProperty(property_t tag, uint32_t memoryIdorIndex)
 {
-    // Inject the reset command.
-    GetProperty cmd(kProperty_CurrentVersion);
+    // Inject the get-property(tag) command.
+    GetProperty cmd(tag, memoryIdorIndex);
     Log::info("inject command '%s'\n", cmd.getName().c_str());
-    this->inject(cmd);
+    inject(cmd);
 
     uint32_t fw_status = cmd.getResponseValues()->at(0);
     std::string fw_msg = cmd.getStatusMessage(fw_status);
@@ -218,13 +279,28 @@ standard_version_t Bootloader::getVersion()
         throw std::runtime_error(fw_msg);
     }
 
-    return standard_version_t(cmd.getResponseValues()->at(1));
+    return *cmd.getResponseValues();
+}
+
+// See Updater.h for documentation of this method.
+bool Bootloader::isCommandSupported(const cmd_t &command)
+{
+    uint32_t fw_response = getProperty(kProperty_AvailableCommands, 0).at(1);
+
+    // See if the command is supported.
+    return ((fw_response & command.mask) == command.mask);
+}
+
+// See host_bootloader.h for documentation of this method.
+standard_version_t Bootloader::getVersion()
+{
+    return standard_version_t(getProperty(kProperty_CurrentVersion, 0).at(1));
 }
 
 // See host_bootloader.h for documentation of this method.
 uint32_t Bootloader::getSecurityState()
 {
-    // Inject the reset command.
+    // Inject the get-property command.
     GetProperty cmd(kProperty_FlashSecurityState);
     Log::info("inject command '%s'\n", cmd.getName().c_str());
     this->inject(cmd);
@@ -238,18 +314,24 @@ uint32_t Bootloader::getSecurityState()
         throw std::runtime_error(fw_msg);
     }
 
-    return cmd.getResponseValues()->at(1);
+    return getProperty(kProperty_FlashSecurityState, 0).at(1);
 }
 
 // See host_bootloader.h for documentation of this method.
-void Bootloader::ping(int retries, unsigned int delay, int comSpeed)
+uint32_t Bootloader::getDataPacketSize()
+{
+    return getProperty(kProperty_MaxPacketSize, 0).at(1);
+}
+
+// See host_bootloader.h for documentation of this method.
+void Bootloader::ping(int retries, unsigned int delay, int comSpeed, int *actualComSpeed)
 {
     this->flush();
 
     SerialPacketizer *pPacketizer = dynamic_cast<SerialPacketizer *>(m_hostPacketizer);
     if (pPacketizer)
     {
-        status_t status = pPacketizer->ping(retries, delay, NULL, comSpeed);
+        status_t status = pPacketizer->ping(retries, delay, NULL, comSpeed, actualComSpeed);
         if (status != kStatus_Success)
         {
             this->flush();
@@ -259,7 +341,7 @@ void Bootloader::ping(int retries, unsigned int delay, int comSpeed)
             Json::Value root;
             root["command"] = "ping";
             root["status"] = Json::Value(Json::objectValue);
-            root["status"]["value"] = static_cast<int32_t>(status);
+            root["status"]["value"] = static_cast<Json::UInt>(status);
             root["status"]["description"] =
                 format_string("%d (0x%X) %s", status, status, cmd.getStatusMessage(status).c_str());
             root["response"] = Json::Value(Json::arrayValue);

@@ -1,38 +1,15 @@
 /*
- * Copyright (c) 2013-14, Freescale Semiconductor, Inc.
+ * Copyright (c) 2013-2014 Freescale Semiconductor, Inc.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
  *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include "blfwk/UsbHidPacketizer.h"
 #include "blfwk/Logging.h"
 #include "blfwk/smart_ptr.h"
 #include "blfwk/utils.h"
-#include "bootloader/bootloader.h"
 #ifdef LINUX
 #include <string.h>
 #endif
@@ -48,6 +25,8 @@ UsbHidPacketizer::UsbHidPacketizer(UsbHidPeripheral *peripheral, uint32_t packet
     : Packetizer(peripheral, packetTimeoutMs)
 {
     m_continuousReadCount = 0;
+    memset(&m_report, 0, sizeof(m_report));
+    memset(&m_abortReport, 0, sizeof(m_abortReport));
 }
 
 // See usb_hid_packetizer.h for documentation of this method.
@@ -104,7 +83,7 @@ status_t UsbHidPacketizer::writePacket(const uint8_t *packet, uint32_t byteCount
 
     m_continuousReadCount = 0;
 
-    return getPeripheral()->write((uint8_t *)&m_report, sizeof(m_report), m_packetTimeoutMs);
+    return getPeripheral()->write((uint8_t *)&m_report, sizeof(bl_hid_header_t) + byteCount, m_packetTimeoutMs);
 }
 
 // See usb_hid_packetizer.h for documentation of this method.
@@ -174,6 +153,12 @@ status_t UsbHidPacketizer::readPacket(uint8_t **packet, uint32_t *packetLength, 
             }
             retryCnt++;
         }
+        else if (lengthInPacket > getMaxPacketSize())
+        {
+            Log::error("Data packet size(%d) is bigger than max supported size(%d).", lengthInPacket,
+                       getMaxPacketSize());
+            return kStatus_Fail;
+        }
     } while (actualBytes && !lengthInPacket && retryCnt < kPollPacketMaxRetryCnt);
 
     // Make sure we got all of the packet. Target will send the maximum
@@ -231,7 +216,7 @@ bool UsbHidPacketizer::pollForAbortPacket()
 // See usb_hid_packetizer.h for documentation of this method.
 uint32_t UsbHidPacketizer::getMaxPacketSize()
 {
-    return kMinPacketBufferSize;
+    return kMaxHostPacketSize;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

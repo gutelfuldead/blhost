@@ -1,31 +1,8 @@
 /*
- * Copyright (c) 2013-2016, Freescale Semiconductor, Inc.
+ * Copyright (c) 2013-2015 Freescale Semiconductor, Inc.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 #ifndef __BOOTLOADER_COMMON_H__
 #define __BOOTLOADER_COMMON_H__
@@ -36,21 +13,161 @@
 #if !defined(WIN32)
 #include <stdbool.h>
 #endif
-#include "bootloader_common.h"
-#include "fsl_common.h"
-
-#if defined(BOOTLOADER_HOST)
 #include "blfwk/bootloader_config.h"
-#elif defined(BUSPAL)
-#include "../src/buspal_config.h"
-#else
-#include "bootloader_config.h"
-#include "target_config.h"
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Definitions
 ////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+* Definitions
+******************************************************************************/
+
+/*! @brief Construct a status code value from a group and code number. */
+#define MAKE_STATUS(group, code) ((((group)*100) + (code)))
+
+/*! @brief Construct the version number for drivers. */
+#define MAKE_VERSION(major, minor, bugfix) (((major) << 16) | ((minor) << 8) | (bugfix))
+
+/* Debug console type definition. */
+#define DEBUG_CONSOLE_DEVICE_TYPE_NONE 0U     /*!< No debug console.             */
+#define DEBUG_CONSOLE_DEVICE_TYPE_UART 1U     /*!< Debug console base on UART.   */
+#define DEBUG_CONSOLE_DEVICE_TYPE_LPUART 2U   /*!< Debug console base on LPUART. */
+#define DEBUG_CONSOLE_DEVICE_TYPE_LPSCI 3U    /*!< Debug console base on LPSCI.  */
+#define DEBUG_CONSOLE_DEVICE_TYPE_USBCDC 4U   /*!< Debug console base on USBCDC. */
+#define DEBUG_CONSOLE_DEVICE_TYPE_FLEXCOMM 5U /*!< Debug console base on USBCDC. */
+#define DEBUG_CONSOLE_DEVICE_TYPE_IUART 6U    /*!< Debug console base on i.MX UART. */
+#define DEBUG_CONSOLE_DEVICE_TYPE_VUSART 7U   /*!< Debug console base on LPC_USART. */
+
+/*! @brief Status group numbers. */
+enum _status_groups
+{
+    kStatusGroup_Generic = 0,                 /*!< Group number for generic status codes. */
+    kStatusGroup_FLASH = 1,                   /*!< Group number for FLASH status codes. */
+    kStatusGroup_LPSPI = 4,                   /*!< Group number for LPSPI status codes. */
+    kStatusGroup_FLEXIO_SPI = 5,              /*!< Group number for FLEXIO SPI status codes. */
+    kStatusGroup_DSPI = 6,                    /*!< Group number for DSPI status codes. */
+    kStatusGroup_FLEXIO_UART = 7,             /*!< Group number for FLEXIO UART status codes. */
+    kStatusGroup_FLEXIO_I2C = 8,              /*!< Group number for FLEXIO I2C status codes. */
+    kStatusGroup_LPI2C = 9,                   /*!< Group number for LPI2C status codes. */
+    kStatusGroup_UART = 10,                   /*!< Group number for UART status codes. */
+    kStatusGroup_I2C = 11,                    /*!< Group number for UART status codes. */
+    kStatusGroup_LPSCI = 12,                  /*!< Group number for LPSCI status codes. */
+    kStatusGroup_LPUART = 13,                 /*!< Group number for LPUART status codes. */
+    kStatusGroup_SPI = 14,                    /*!< Group number for SPI status code.*/
+    kStatusGroup_XRDC = 15,                   /*!< Group number for XRDC status code.*/
+    kStatusGroup_SEMA42 = 16,                 /*!< Group number for SEMA42 status code.*/
+    kStatusGroup_SDHC = 17,                   /*!< Group number for SDHC status code */
+    kStatusGroup_SDMMC = 18,                  /*!< Group number for SDMMC status code */
+    kStatusGroup_SAI = 19,                    /*!< Group number for SAI status code */
+    kStatusGroup_MCG = 20,                    /*!< Group number for MCG status codes. */
+    kStatusGroup_SCG = 21,                    /*!< Group number for SCG status codes. */
+    kStatusGroup_SDSPI = 22,                  /*!< Group number for SDSPI status codes. */
+    kStatusGroup_FLEXIO_I2S = 23,             /*!< Group number for FLEXIO I2S status codes */
+    kStatusGroup_FLEXIO_MCULCD = 24,          /*!< Group number for FLEXIO LCD status codes */
+    kStatusGroup_FLASHIAP = 25,               /*!< Group number for FLASHIAP status codes */
+    kStatusGroup_FLEXCOMM_I2C = 26,           /*!< Group number for FLEXCOMM I2C status codes */
+    kStatusGroup_I2S = 27,                    /*!< Group number for I2S status codes */
+    kStatusGroup_IUART = 28,                  /*!< Group number for IUART status codes */
+    kStatusGroup_CSI = 29,                    /*!< Group number for CSI status codes */
+    kStatusGroup_SDRAMC = 35,                 /*!< Group number for SDRAMC status codes. */
+    kStatusGroup_POWER = 39,                  /*!< Group number for POWER status codes. */
+    kStatusGroup_ENET = 40,                   /*!< Group number for ENET status codes. */
+    kStatusGroup_PHY = 41,                    /*!< Group number for PHY status codes. */
+    kStatusGroup_TRGMUX = 42,                 /*!< Group number for TRGMUX status codes. */
+    kStatusGroup_SMARTCARD = 43,              /*!< Group number for SMARTCARD status codes. */
+    kStatusGroup_LMEM = 44,                   /*!< Group number for LMEM status codes. */
+    kStatusGroup_QSPI = 45,                   /*!< Group number for QSPI status codes. */
+    kStatusGroup_DMA = 50,                    /*!< Group number for DMA status codes. */
+    kStatusGroup_EDMA = 51,                   /*!< Group number for EDMA status codes. */
+    kStatusGroup_DMAMGR = 52,                 /*!< Group number for DMAMGR status codes. */
+    kStatusGroup_FLEXCAN = 53,                /*!< Group number for FlexCAN status codes. */
+    kStatusGroup_LTC = 54,                    /*!< Group number for LTC status codes. */
+    kStatusGroup_FLEXIO_CAMERA = 55,          /*!< Group number for FLEXIO CAMERA status codes. */
+    kStatusGroup_LPC_SPI = 56,                /*!< Group number for LPC_SPI status codes. */
+    kStatusGroup_LPC_USART = 57,              /*!< Group number for LPC_USART status codes. */
+    kStatusGroup_DMIC = 58,                   /*!< Group number for DMIC status codes. */
+    kStatusGroup_SDIF = 59,                   /*!< Group number for SDIF status codes.*/
+    kStatusGroup_SPIFI = 60,                  /*!< Group number for SPIFI status codes. */
+    kStatusGroup_OTP = 61,                    /*!< Group number for OTP status codes. */
+    kStatusGroup_MCAN = 62,                   /*!< Group number for MCAN status codes. */
+    kStatusGroup_CAAM = 63,                   /*!< Group number for CAAM status codes. */
+    kStatusGroup_ECSPI = 64,                  /*!< Group number for ECSPI status codes. */
+    kStatusGroup_USDHC = 65,                  /*!< Group number for USDHC status codes.*/
+    kStatusGroup_LPC_I2C = 66,                /*!< Group number for LPC_I2C status codes.*/
+    kStatusGroup_ESAI = 69,                   /*!< Group number for ESAI status codes. */
+    kStatusGroup_FLEXSPI = 70,                /*!< Group number for FLEXSPI status codes. */
+    kStatusGroup_MMDC = 71,                   /*!< Group number for MMDC status codes. */
+    kStatusGroup_MICFIL = 72,                 /*!< Group number for MIC status codes. */
+    kStatusGroup_SDMA = 73,                   /*!< Group number for SDMA status codes. */
+    kStatusGroup_NOTIFIER = 98,               /*!< Group number for NOTIFIER status codes. */
+    kStatusGroup_DebugConsole = 99,           /*!< Group number for debug console status codes. */
+    kStatusGroup_ApplicationRangeStart = 100, /*!< Starting number for application groups. */
+};
+
+enum _bl_status_groups
+{
+    kStatusGroup_Bootloader = kStatusGroup_ApplicationRangeStart, //!< Bootloader status group number (100).
+    kStatusGroup_SBLoader,                                        //!< SB loader status group number (101).
+    kStatusGroup_MemoryInterface,                                 //!< Memory interface status group number (102).
+    kStatusGroup_PropertyStore,                                   //!< Property store status group number (103).
+    kStatusGroup_AppCrcCheck,                                     //!< Application crc check status group number (104).
+    kStatusGroup_Packetizer,                                      //!< Packetizer status group number (105).
+    kStatusGroup_ReliableUpdate,                                  //!< Reliable Update status groupt number (106).
+    kStatusGroup_Authentication,                                  //!< Authentication feature (107).
+    kStatusGroup_RomApi                                           //!< ROM API status group number (108).
+};
+
+/*! @brief Generic status return codes. */
+enum _generic_status
+{
+    kStatus_Success = MAKE_STATUS(kStatusGroup_Generic, 0),
+    kStatus_Fail = MAKE_STATUS(kStatusGroup_Generic, 1),
+    kStatus_ReadOnly = MAKE_STATUS(kStatusGroup_Generic, 2),
+    kStatus_OutOfRange = MAKE_STATUS(kStatusGroup_Generic, 3),
+    kStatus_InvalidArgument = MAKE_STATUS(kStatusGroup_Generic, 4),
+    kStatus_Timeout = MAKE_STATUS(kStatusGroup_Generic, 5),
+    kStatus_NoTransferInProgress = MAKE_STATUS(kStatusGroup_Generic, 6),
+};
+
+//! @brief Bootloader status codes.
+//! @ingroup bl_core
+enum _bootloader_status
+{
+    kStatus_UnknownCommand = MAKE_STATUS(kStatusGroup_Bootloader, 0),
+    kStatus_SecurityViolation = MAKE_STATUS(kStatusGroup_Bootloader, 1),
+    kStatus_AbortDataPhase = MAKE_STATUS(kStatusGroup_Bootloader, 2),
+    kStatus_Ping = MAKE_STATUS(kStatusGroup_Bootloader, 3),
+    kStatus_NoResponse = MAKE_STATUS(kStatusGroup_Bootloader, 4),
+    kStatus_NoResponseExpected = MAKE_STATUS(kStatusGroup_Bootloader, 5),
+    kStatus_CommandUnsupported = MAKE_STATUS(kStatusGroup_Bootloader, 6),
+};
+
+// !@brief SB loader status codes.
+enum _sbloader_status
+{
+    kStatusRomLdrSectionOverrun = MAKE_STATUS(kStatusGroup_SBLoader, 0),
+    kStatusRomLdrSignature = MAKE_STATUS(kStatusGroup_SBLoader, 1),
+    kStatusRomLdrSectionLength = MAKE_STATUS(kStatusGroup_SBLoader, 2),
+    kStatusRomLdrUnencryptedOnly = MAKE_STATUS(kStatusGroup_SBLoader, 3),
+    kStatusRomLdrEOFReached = MAKE_STATUS(kStatusGroup_SBLoader, 4),
+    kStatusRomLdrChecksum = MAKE_STATUS(kStatusGroup_SBLoader, 5),
+    kStatusRomLdrCrc32Error = MAKE_STATUS(kStatusGroup_SBLoader, 6),
+    kStatusRomLdrUnknownCommand = MAKE_STATUS(kStatusGroup_SBLoader, 7),
+    kStatusRomLdrIdNotFound = MAKE_STATUS(kStatusGroup_SBLoader, 8),
+    kStatusRomLdrDataUnderrun = MAKE_STATUS(kStatusGroup_SBLoader, 9),
+    kStatusRomLdrJumpReturned = MAKE_STATUS(kStatusGroup_SBLoader, 10),
+    kStatusRomLdrCallFailed = MAKE_STATUS(kStatusGroup_SBLoader, 11),
+    kStatusRomLdrKeyNotFound = MAKE_STATUS(kStatusGroup_SBLoader, 12),
+    kStatusRomLdrSecureOnly = MAKE_STATUS(kStatusGroup_SBLoader, 13),
+    kStatusRomLdrResetReturned = MAKE_STATUS(kStatusGroup_SBLoader, 14),
+    kStatusRomLdrRollbackBlocked = MAKE_STATUS(kStatusGroup_SBLoader, 15),
+    kStatusRomLdrInvalidSectionMacCount = MAKE_STATUS(kStatusGroup_SBLoader, 16),
+    kStatusRomLdrUnexpectedCommand = MAKE_STATUS(kStatusGroup_SBLoader, 17),
+};
+
+/*! @brief Type used for all status and error return values. */
+typedef int32_t status_t;
 
 #ifndef NULL
 #define NULL 0
@@ -130,38 +247,6 @@ static inline void debug_printf(const char *format, ...)
     } while (false)
 #endif // (DEBUG || _DEBUG) && !DEBUG_PRINT_DISABLE
 
-//! @brief Callback function invoked for a pin change interrupt.
-//!
-//! @ingroup bl_hw
-typedef void (*pin_irq_callback_t)(uint32_t instance);
-
-//! @brief Bootloader status group numbers.
-//!
-//! @ingroup bl_core
-enum _bl_status_groups
-{
-    kStatusGroup_Bootloader = kStatusGroup_ApplicationRangeStart, //!< Bootloader status group number (100).
-    kStatusGroup_SBLoader,                                        //!< SB loader status group number (101).
-    kStatusGroup_MemoryInterface,                                 //!< Memory interface status group number (102).
-    kStatusGroup_PropertyStore,                                   //!< Property store status group number (103).
-    kStatusGroup_AppCrcCheck,                                     //!< Application crc check status group number (104).
-    kStatusGroup_Packetizer,                                      //!< Packetizer status group number (105).
-    kStatusGroup_ReliableUpdate                                   //!< Reliable Update status groupt number (106).
-};
-
-//! @brief Driver status group numbers.
-//!
-//! @ingroup bl_core
-enum _bl_driver_status_groups
-{
-    kStatusGroup_QuadSPIDriver = 4, //!< QSPI driver status group number.
-    kStatusGroup_OTFADDriver = 5,   //!< OTFAD driver status group number.
-};
-
-#if defined(__CC_ARM)
-#pragma anon_unions
-#endif
-
 //! @brief Structure of version property.
 //!
 //! @ingroup bl_core
@@ -187,122 +272,6 @@ typedef union StandardVersion
     }
 #endif
 } standard_version_t;
-
-// #define MAKE_VERSION(bugfix, minor, major, name) (((name) << 24) | ((major) << 16) | ((minor) << 8 ) | (bugfix))
-
-//! @brief External memory identifiers.
-//!
-//! @ingroup bl_core
-enum _external_mem_identifiers
-{
-    kExternalMemId_QuadSPI0 = 1,
-};
-
-//! @brief Bootloader clock option
-typedef enum _bootloader_clock_option
-{
-    kClockOption_EnterBootloader = 0, //!< Clock option for entering bootloader
-    kClockOption_ExitBootloader = 1,  //!< Clock option for exiting bootloader
-} bootloader_clock_option_t;
-
-////////////////////////////////////////////////////////////////////////////////
-// Prototypes
-////////////////////////////////////////////////////////////////////////////////
-
-//! @addtogroup bl_hw
-//! @{
-
-//! @brief Initialize the hardware such as pinmux.
-void init_hardware(void);
-
-//! @brief DeInitialize the hardware such as disabling port clock gate
-void deinit_hardware(void);
-
-//! @brief Update available peripherals based on specific chips
-void update_available_peripherals(void);
-
-//! @brief Returns the logic level of the board specific GPIO pin used for autobaud.
-// uint32_t read_autobaud_pin(uint32_t instance);
-
-//! @brief Configure hardware clocks.
-void configure_clocks(bootloader_clock_option_t option);
-
-//! @brief Returns the available lirc clock frequency in Hertz.
-uint32_t get_available_lirc_clock(void);
-
-//! @brief Returns the current bus clock frequency in Hertz.
-uint32_t get_bus_clock(void);
-
-//! @brief Returns the current core clock frequency in Hertz.
-uint32_t get_system_core_clock(void);
-
-//! @brief Configure usb clock
-bool usb_clock_init(void);
-
-//! @brief Returns the value in MHz of the UART clock based on the instance.
-uint32_t get_uart_clock(uint32_t instance);
-
-//! @brief Returns true if reset BOOTROM mode is selected.
-bool is_boot_pin_asserted(void);
-
-//! @brief Enables the autobaud pin IRQ for the specific instance passed.
-void enable_autobaud_pin_irq(uint32_t instance, pin_irq_callback_t func);
-
-//! @brief Disables the autobaud pin IRQ for the instance passed.
-void disable_autobaud_pin_irq(uint32_t instance);
-
-//! @brief Declaration for the reset handler, which is defined in assembler.
-void Reset_Handler(void);
-
-//! @brief Initialize watchdog
-void bootloader_watchdog_init(void);
-
-//! @brief Service watchdog
-void bootloader_watchdog_service(void);
-
-//! @brief De-initialize watchdog
-void bootloader_watchdog_deinit(void);
-
-//! @brief Determine if QSPI module to be configured.
-bool qspi_need_configure(void);
-
-//! @brief Initialize QSPI and OTFAD module.
-//! @param none
-status_t otfad_init_as_needed(void);
-
-//! @brief Bypass OTFAD module as needed.
-//! @param none
-status_t otfad_bypass_as_needed(void);
-
-//! @brief Resume OTFAD module as needed.
-//! @param none
-status_t oftfad_resume_as_needed(void);
-
-//! @brief Determine if QSPI memory is present or not.
-bool is_qspi_present(void);
-
-//! @brief Determine if OTFAD module is present or not.
-bool is_otfad_present(void);
-
-//! @brief Determine if LTC module is present or not.
-bool is_ltc_present(void);
-
-//! @brief Return status for intializing qspi and otfad modules
-status_t get_qspi_otfad_init_status(void);
-
-//!@bief Update status for intializing qspi and otfad modules
-void update_qspi_otfad_init_status(status_t initStatus);
-
-//!@brief Determine is the Secondary I2C slave address is enabled.
-bool is_secondary_i2c_slave_address_enabled(void);
-
-//!@brief Check if data to be accessed is in execute-only region.
-bool is_in_execute_only_region(uint32_t start, uint32_t lengthInBytes);
-
-//!@brief Check if second core is present.
-bool is_second_core_present(void);
-
-//! @}
 
 #endif // __BOOTLOADER_COMMON_H__
 ////////////////////////////////////////////////////////////////////////////////

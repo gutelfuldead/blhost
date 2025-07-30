@@ -1,8 +1,10 @@
 /*
  * File:    HexValues.h
  *
- * Copyright (c) Freescale Semiconductor, Inc. All rights reserved.
- * See included license file for license details.
+ * Copyright (c) 2015 Freescale Semiconductor, Inc.
+ * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 #if !defined(_HexValues_h_)
 #define _HexValues_h_

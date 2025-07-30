@@ -25,6 +25,7 @@
 
 #ifdef MACOSX
 #include <IOKit/serial/ioss.h>
+#include <sys/ioctl.h>
 
 #define B1500000 1500000
 #define B1000000 1000000
@@ -44,12 +45,10 @@ typedef long speed_t;
 #else
 
 #include <unistd.h>
-#include <sys/ioctl.h>
-
-#include "picocom/custbaud.h"
-#ifdef USE_CUSTOM_BAUD
-#include CUSTOM_BAUD_HEAD
-#endif
+#include <termios.h>
+#include <sys/select.h>
+#include <sys/types.h>
+#include <sys/time.h>
 
 #endif
 

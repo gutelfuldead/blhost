@@ -1,45 +1,27 @@
 /*
  * Copyright (c) 2013-2015, Freescale Semiconductor, Inc.
+ * Copyright 2016-2020 NXP.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #ifndef _Command_h_
 #define _Command_h_
 
-#include <array>
 #include <assert.h>
+
+#include <array>
+
+#include "BusPal.h"
 #include "DataSource.h"
 #include "Packetizer.h"
-#include "host_types.h"
-#include "format_string.h"
-#include "property/property.h"
+#include "Progress.h"
 #include "SourceFile.h"
-#include "BusPal.h"
+#include "format_string.h"
+#include "host_types.h"
+#include "memory/memory.h"
+#include "property/property.h"
 
 //! @addtogroup host_commands
 //! @{
@@ -80,15 +62,29 @@ const cmd_t kCommand_FlashEraseAllUnsecure(kCommandTag_FlashEraseAllUnsecure, 0x
 const cmd_t kCommand_FlashProgramOnce(kCommandTag_FlashProgramOnce, 0x00002000, "flash-program-once");
 const cmd_t kCommand_FlashReadOnce(kCommandTag_FlashReadOnce, 0x00004000, "flash-read-once");
 const cmd_t kCommand_FlashReadResource(kCommandTag_FlashReadResource, 0x00008000, "flash-read-resource");
-const cmd_t kCommand_ConfigureQuadSpi(kCommandTag_ConfigureQuadSpi, 0x00010000, "configure-quadspi");
-const cmd_t kCommand_ReliableUpdate(kCommandTag_ReliableUpdate, 0x00100000, "reliable-update");
-// flash-image is not a ROM basic command, but a combination of several basic commands.
-const cmd_t kCommand_FlashImage(0x00, 0x00000000, "flash-image");
+const cmd_t kCommand_ConfigureMemory(kCommandTag_ConfigureMemory, 0x00010000, "configure-memory");
+const cmd_t kCommand_ReliableUpdate(kCommandTag_ReliableUpdate, 0x00020000, "reliable-update");
+const cmd_t kCommand_GenerateKeyBlob(kCommandTag_GenerateKeyBlob, 0x00040000, "generate-key-blob");
+const cmd_t kCommand_FuseProgram(kCommandTag_FuseProgram, 0x00080000, "fuse-program");
+const cmd_t kCommand_KeyProvisioning(kCommandTag_KeyProvisioning, 0x00100000, "key-provisioning");
+const cmd_t kCommand_TrustProvisioning(kCommandTag_TrustProvisioning, 0x00200000, "trust-provisioning");
+const cmd_t kCommand_FuseRead(kCommandTag_FuseRead, 0x00400000, "fuse-read");
+// Command for Bus Pal.
 const cmd_t kCommand_ConfigureI2c(kCommandTag_ConfigureI2c, 0x00020000, "i2c");
 const cmd_t kCommand_ConfigureSpi(kCommandTag_ConfigureSpi, 0x00040000, "spi");
 const cmd_t kCommand_ConfigureCan(kCommandTag_ConfigureCan, 0x00080000, "can");
+// flash-image and list-memory is not a ROM basic command, but a command sequence combined by several basic commands.
+const cmd_t kCommand_FlashImage(0x00, 0x00000000, "flash-image");
+const cmd_t kCommand_ListMemory(0x00, 0x00000000, "list-memory");
+// efuse-program-once and efuse-read-once are alias of flash-program-once and flash-read-once,
+// to avoid the confusion that efuse is not a part of internal flash.
+const cmd_t kCommand_EfuseProgramOnce(0x00, 0x00000000, "efuse-program-once");
+const cmd_t kCommand_EfuseReadOnce(0x00, 0x00000000, "efuse-read-once");
+// load-image doesn't sent any command, but data packet directly.
+const cmd_t kCommand_LoadImage(0x00, 0x00000000, "load-image");
+const cmd_t kCommand_ProgramAESKey(0x00, 0x00000000, "program-aeskey");
 
-const array<const cmd_t, 22> kCommands = { kCommand_FlashEraseAll,
+const array<const cmd_t, 23> kCommands = { kCommand_FlashEraseAll,
                                            kCommand_FlashEraseRegion,
                                            kCommand_ReadMemory,
                                            kCommand_WriteMemory,
@@ -104,12 +100,64 @@ const array<const cmd_t, 22> kCommands = { kCommand_FlashEraseAll,
                                            kCommand_FlashProgramOnce,
                                            kCommand_FlashReadOnce,
                                            kCommand_FlashReadResource,
-                                           kCommand_ConfigureQuadSpi,
+                                           kCommand_ConfigureMemory,
                                            kCommand_ReliableUpdate,
-                                           kCommand_FlashImage,
-                                           kCommand_ConfigureI2c,
-                                           kCommand_ConfigureSpi,
-                                           kCommand_ConfigureCan };
+                                           kCommand_GenerateKeyBlob,
+                                           kCommand_FuseProgram,
+                                           kCommand_KeyProvisioning,
+                                           kCommand_TrustProvisioning,
+                                           kCommand_FuseRead };
+//@}
+
+//! @name option tags, names.
+//@{
+struct opt_t
+{
+    uint32_t tag;
+    const char *const name;
+
+    opt_t(uint32_t tag, const char *name)
+        : tag(tag)
+        , name(name)
+    {
+    }
+};
+
+/*!< Operations of trust provisioning command. */
+/*!< OEM trusted facility commands. */
+const opt_t kOperation_Tp_OemGenMasterShare(kTrustProvisioning_Operation_Oem_GenMasterShare, "oem_gen_master_share");
+const opt_t kOperation_Tp_OemSetMasterShare(kTrustProvisioning_Operation_Oem_SetMasterShare, "oem_set_master_share");
+const opt_t kOperation_Tp_OemGetCustCertDicePuk(kTrustProvisioning_Operation_Oem_GetCustCertDicePuk,
+                                                "oem_get_cust_cert_dice_puk");
+const opt_t kOperation_Tp_HsmGenKey(kTrustProvisioning_Operation_Hsm_GenKey, "hsm_gen_key");
+const opt_t kOperation_Tp_HsmStoreKey(kTrustProvisioning_Operation_Hsm_StoreKey, "hsm_store_key");
+const opt_t kOperation_Tp_HsmEncryptBlock(kTrustProvisioning_Operation_Hsm_EncryptBlock, "hsm_enc_blk");
+const opt_t kOperation_Tp_HsmEncryptSign(kTrustProvisioning_Operation_Hsm_EncryptSign, "hsm_enc_sign");
+/*!< NXP factory commands. */
+const opt_t kOperation_Tp_NxpRtsGetId(kTrustProvisioning_Operation_Nxp_RtsGetId, "nxp_rts_get_id");
+const opt_t kOperation_Tp_NxpRtsInsertCertificate(kTrustProvisioning_Operation_Nxp_RtsInsertCertificate,
+                                                  "nxp_rts_ins_cert");
+const opt_t kOperation_Tp_NxpSsfInsertCertificate(kTrustProvisioning_Operation_Nxp_SsfInsertCertificate,
+                                                  "nxp_ssf_ins_cert");
+/*!< OEM/CM factory commands. */
+const opt_t kOperation_Tp_DevAuthChallengeNxp(kTrustProvisioning_Operation_Dev_AuthChallengeNxp,
+                                              "dev_auth_challenge_nxp");
+const opt_t kOperation_Tp_DevAuthChallengeOem(kTrustProvisioning_Operation_Dev_AuthChallengeOem,
+                                              "dev_auth_challenge_oem");
+const opt_t kOperation_Tp_DevSetWrapData(kTrustProvisioning_Operation_Dev_SetWrapData, "dev_set_wrap_data");
+
+/* HSM GEN KEY - key type definition. */
+const opt_t kKeyType_Tp_HsmGenKey_MfwIsK(kKeyType_HsmGenKey_MfwIsK, "MFWISK");
+const opt_t kKeyType_Tp_HsmGenKey_MfwEncK(kKeyType_HsmGenKey_MfwEncK, "MFWENCK");
+const opt_t kKeyType_Tp_HsmGenKey_GenSignK(kKeyType_HsmGenKey_GenSignK, "SIGNK");
+const opt_t kKeyType_Tp_HsmGenKey_GenCustMkSK(kKeyType_HsmGenKey_GenCustMkSK, "CUSTMKSK");
+/* HSM STORE KEY - key type definition. */
+const opt_t kKeyType_Tp_HsmStoreKey_CKDFK(kKeyType_HsmStoreKey_CKDFK, "CKDFK");
+const opt_t kKeyType_Tp_HsmStoreKey_HKDFK(kKeyType_HsmStoreKey_HKDFK, "HKDFK");
+const opt_t kKeyType_Tp_HsmStoreKey_HMACK(kKeyType_HsmStoreKey_HMACK, "HMACK");
+const opt_t kKeyType_Tp_HsmStoreKey_CMACK(kKeyType_HsmStoreKey_CMACK, "CMACK");
+const opt_t kKeyType_Tp_HsmStoreKey_AESK(kKeyType_HsmStoreKey_AESK, "AESK");
+const opt_t kKeyType_Tp_HsmStoreKey_KUOK(kKeyType_HsmStoreKey_KUOK, "KUOK");
 //@}
 
 //! @name Property tags.
@@ -135,8 +183,9 @@ const property_t kProperty_FlashSizeInBytes(kPropertyTag_FlashSizeInBytes, "flas
 const property_t kProperty_FlashSectorSize(kPropertyTag_FlashSectorSize, "flash-sector-size");
 const property_t kProperty_FlashBlockCount(kPropertyTag_FlashBlockCount, "flash-block-count");
 const property_t kProperty_AvailableCommands(kPropertyTag_AvailableCommands, "available-commands");
-const property_t kProperty_CrcCheckStatus(kPropertyTag_CrcCheckStatus, "crc-check-status");
+const property_t kProperty_CheckStatus(kPropertyTag_CheckStatus, "check-status");
 const property_t kProperty_Reserved9(kPropertyTag_Reserved9, "reserved");
+
 const property_t kProperty_VerifyWrites(kPropertyTag_VerifyWrites, "verify-writes");
 const property_t kProperty_MaxPacketSize(kPropertyTag_MaxPacketSize, "max-packet-size");
 const property_t kProperty_ReservedRegions(kPropertyTag_ReservedRegions, "reserved-regions");
@@ -144,7 +193,7 @@ const property_t kProperty_Reserved13(kPropertyTag_Reserved13, "reserved");
 const property_t kProperty_RAMStartAddress(kPropertyTag_RAMStartAddress, "ram-start-address");
 const property_t kProperty_RAMSizeInBytes(kPropertyTag_RAMSizeInBytes, "ram-size-in-bytes");
 const property_t kProperty_SystemDeviceId(kPropertyTag_SystemDeviceId, "system-device-id");
-const property_t kProperty_FlashSecurityState(kPropertyTag_FlashSecurityState, "flash-security-state");
+const property_t kProperty_FlashSecurityState(kPropertyTag_SecurityState, "security-state");
 const property_t kProperty_UniqueDeviceId(kPropertyTag_UniqueDeviceId, "unique-device-id");
 const property_t kProperty_FacSupport(kPropertyTag_FacSupport, "flash-fac-support");
 const property_t kProperty_FlashAccessSegmentSize(kPropertyTag_FlashAccessSegmentSize, "flash-access-segment-size");
@@ -154,26 +203,79 @@ const property_t kProperty_QspiInitStatus(kPropertyTag_QspiInitStatus, "qspi/otf
 const property_t kProperty_TargetVersion(kPropertyTag_TargetVersion, "target-version");
 const property_t kProperty_ExernalMemoryAttributes(kPropertyTag_ExternalMemoryAttributes, "external-memory-attributes");
 const property_t kProperty_ReliableUpdateStatus(kPropertyTag_ReliableUpdateStatus, "reliable-update-status");
+const property_t kProperty_FlashPageSize(kPropertyTag_FlashPageSize, "flash-page-size");
+const property_t kProperty_IrqNotifierPin(kPropertyTag_IrqNotifierPin, "irq-notify-pin");
+const property_t kProperty_FfrKeystoreUpdateOpt(kPropertyTag_FfrKeystoreUpdateOpt, "ffr-keystore_update-opt");
+const property_t kProperty_ByteWriteTimeoutMs(kPropertyTag_ByteWriteTimeoutMs, "byte-write-timeout-ms");
 const property_t kProperty_Invalid(kPropertyTag_InvalidProperty, "invalid-property");
 
-typedef array<const property_t, 27> PropertyArray;
+typedef array<const property_t, 31> PropertyArray;
 
-const PropertyArray kProperties = {
-    kProperty_ListProperties,         kProperty_CurrentVersion,
-    kProperty_AvailablePeripherals,   kProperty_FlashStartAddress,
-    kProperty_FlashSizeInBytes,       kProperty_FlashSectorSize,
-    kProperty_FlashBlockCount,        kProperty_AvailableCommands,
-    kProperty_CrcCheckStatus,         kProperty_Reserved9,
-    kProperty_VerifyWrites,           kProperty_MaxPacketSize,
-    kProperty_ReservedRegions,        kProperty_Reserved13,
-    kProperty_RAMStartAddress,        kProperty_RAMSizeInBytes,
-    kProperty_SystemDeviceId,         kProperty_FlashSecurityState,
-    kProperty_UniqueDeviceId,         kProperty_FacSupport,
-    kProperty_FlashAccessSegmentSize, kProperty_FlashAccessSegmentCount,
-    kProperty_FlashReadMargin,        kProperty_QspiInitStatus,
-    kProperty_TargetVersion,          kProperty_ExernalMemoryAttributes,
-    kProperty_ReliableUpdateStatus,
+const PropertyArray kProperties = { kProperty_ListProperties,
+                                    kProperty_CurrentVersion,
+                                    kProperty_AvailablePeripherals,
+                                    kProperty_FlashStartAddress,
+                                    kProperty_FlashSizeInBytes,
+                                    kProperty_FlashSectorSize,
+                                    kProperty_FlashBlockCount,
+                                    kProperty_AvailableCommands,
+                                    kProperty_CheckStatus,
+                                    kProperty_Reserved9,
+                                    kProperty_VerifyWrites,
+                                    kProperty_MaxPacketSize,
+                                    kProperty_ReservedRegions,
+                                    kProperty_Reserved13,
+                                    kProperty_RAMStartAddress,
+                                    kProperty_RAMSizeInBytes,
+                                    kProperty_SystemDeviceId,
+                                    kProperty_FlashSecurityState,
+                                    kProperty_UniqueDeviceId,
+                                    kProperty_FacSupport,
+                                    kProperty_FlashAccessSegmentSize,
+                                    kProperty_FlashAccessSegmentCount,
+                                    kProperty_FlashReadMargin,
+                                    kProperty_QspiInitStatus,
+                                    kProperty_TargetVersion,
+                                    kProperty_ExernalMemoryAttributes,
+                                    kProperty_ReliableUpdateStatus,
+                                    kProperty_FlashPageSize,
+                                    kProperty_IrqNotifierPin,
+                                    kProperty_ByteWriteTimeoutMs,
+                                    kProperty_FfrKeystoreUpdateOpt };
+//@}
+
+//! @name Memory IDs.
+//@{
+struct memory_t
+{
+    uint32_t memoryId;
+    const char *description;
+
+    memory_t(uint32_t memoryId, const char *description)
+        : memoryId(memoryId)
+        , description(description)
+    {
+    }
 };
+
+const memory_t kMemory_Internal(kMemoryInternal, "Internal");
+const memory_t kMemory_QuadSpi(kMemoryQuadSpi0, "QuadSPI");
+const memory_t kMemory_IFR0(kMemoryIFR0, "IFR0");
+const memory_t kMemory_ExecuteOnly(kMemoryFlashExecuteOnly, "ExecuteOnly");
+const memory_t kMemory_SemcNor(kMemorySemcNor, "SEMC NOR");
+const memory_t kMemory_FlexSpiNor(kMemoryFlexSpiNor, "FlexSPI NOR");
+const memory_t kMemory_SemcNand(kMemorySemcNand, "SEMC NAND");
+const memory_t kMemory_SpiNand(kMemorySpiNand, "SPI NAND");
+const memory_t kMemory_SpiEeprom(kMemorySpiNorEeprom, "SPI NOR/EEPROM");
+const memory_t kMemory_I2cEeprom(kMemoryI2cNorEeprom, "I2C NOR/EEPROM");
+const memory_t kMemory_SdCard(kMemorySDCard, "SD/SDHC");
+const memory_t kMemory_MmcCard(kMemoryMMCCard, "MMC/eMMC");
+
+typedef array<const memory_t, 9> MemoryArray;
+
+const MemoryArray kMemories = { kMemory_QuadSpi,   kMemory_SemcNor, kMemory_FlexSpiNor,
+                                kMemory_SemcNand,  kMemory_SpiNand, kMemory_SpiEeprom,
+                                kMemory_I2cEeprom, kMemory_SdCard,  kMemory_MmcCard };
 //@}
 
 //! @name Peripheral bits.
@@ -217,77 +319,6 @@ struct StatusMessageTableEntry
 //! @warning These strings need to be kept in sync with the platform status codes
 //! in the src/include/bootloader_common.h file.
 extern StatusMessageTableEntry g_statusCodes[];
-
-/*!
-* @brief Contains the callback function for progress and abort phase.
-*
-*/
-class Progress
-{
-public:
-    //! @brief Default constructor.
-    Progress()
-        : m_segmentIndex(1)
-        , m_segmentCount(1)
-        , m_progressCallback(NULL)
-        , m_abortPhase(NULL)
-    {
-    }
-
-    //! @brief Constructor with initial callback.
-    Progress(void (*callback)(int, int, int), bool *abortPhase)
-        : m_segmentIndex(1)
-        , m_segmentCount(1)
-        , m_progressCallback(callback)
-        , m_abortPhase(abortPhase)
-    {
-    }
-
-    //! @brief Default destructor.
-    ~Progress() {}
-    //! @brief execute the progress callback function.
-    //!
-    //! @param percentage the percentage of current executed progress.
-    void progressCallback(int percentage)
-    {
-        if (m_progressCallback != NULL)
-        {
-            m_progressCallback(percentage, m_segmentIndex, m_segmentCount);
-        }
-    }
-
-    //! @brief Check whether the data phase is canceled.
-    bool abortPhase(void)
-    {
-        if ((m_abortPhase) && (*m_abortPhase == true))
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    //! @biref initialized the progress callback function and the variable of controlling data phase.
-    //!
-    //! @param callback The progress callback function.
-    //!
-    //! @param abortPhase The pointer pointing to a variable controlling whether abort current data phase.
-    void registerCallback(void (*callback)(int, int, int), bool *abortPhase)
-    {
-        m_progressCallback = callback;
-        m_abortPhase = abortPhase;
-    }
-
-public:
-    int m_segmentIndex; //!< Index of data segment in progressing.
-    int m_segmentCount; //!< The number of data segments.
-
-private:
-    void (*m_progressCallback)(int percentage, int segmentIndex, int segmentCount); //!< The progress callback function.
-    bool *m_abortPhase; //!< The pointer pointing to a variable controlling whether abort current data phase.
-};
 
 //! @name Commands
 //@{
@@ -382,6 +413,7 @@ public:
 
     //! @brief initial the process callback.
     void registerProgress(Progress *progress) { m_progress = progress; }
+
 protected:
     //! @brief Check generic response packet.
     //!
@@ -409,8 +441,7 @@ protected:
     //! @brief Constants.
     enum _command_packet_constants
     {
-        kMaxCommandArguments = (kDefaultMaxPacketSize - sizeof(command_packet_t)) /
-                               sizeof(uint32_t) //!< 7 args max for packet size 32 bytes
+        kMaxCommandArguments = 16 //!< 16 args max
     };
 
     //! Format of command packet.
@@ -472,6 +503,110 @@ public:
         m_packet.m_arguments[1] = arg2;
         m_packet.m_arguments[2] = arg3;
         m_packet.m_arguments[3] = arg4;
+    }
+
+    //! @brief Constructor that takes four command arguments.
+    CommandPacket(uint8_t tag, uint8_t flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5)
+    {
+        m_numArguments = 5;
+        m_packet.init(tag, flags, m_numArguments);
+        m_packet.m_arguments[0] = arg1;
+        m_packet.m_arguments[1] = arg2;
+        m_packet.m_arguments[2] = arg3;
+        m_packet.m_arguments[3] = arg4;
+        m_packet.m_arguments[4] = arg5;
+    }
+
+    //! @brief Constructor that takes four command arguments.
+    CommandPacket(uint8_t tag,
+                  uint8_t flags,
+                  uint32_t arg1,
+                  uint32_t arg2,
+                  uint32_t arg3,
+                  uint32_t arg4,
+                  uint32_t arg5,
+                  uint32_t arg6)
+    {
+        m_numArguments = 6;
+        m_packet.init(tag, flags, m_numArguments);
+        m_packet.m_arguments[0] = arg1;
+        m_packet.m_arguments[1] = arg2;
+        m_packet.m_arguments[2] = arg3;
+        m_packet.m_arguments[3] = arg4;
+        m_packet.m_arguments[4] = arg5;
+        m_packet.m_arguments[5] = arg6;
+    }
+
+    //! @brief Constructor that takes four command arguments.
+    CommandPacket(uint8_t tag,
+                  uint8_t flags,
+                  uint32_t arg1,
+                  uint32_t arg2,
+                  uint32_t arg3,
+                  uint32_t arg4,
+                  uint32_t arg5,
+                  uint32_t arg6,
+                  uint32_t arg7)
+    {
+        m_numArguments = 7;
+        m_packet.init(tag, flags, m_numArguments);
+        m_packet.m_arguments[0] = arg1;
+        m_packet.m_arguments[1] = arg2;
+        m_packet.m_arguments[2] = arg3;
+        m_packet.m_arguments[3] = arg4;
+        m_packet.m_arguments[4] = arg5;
+        m_packet.m_arguments[5] = arg6;
+        m_packet.m_arguments[6] = arg7;
+    }
+
+    //! @brief Constructor that takes four command arguments.
+    CommandPacket(uint8_t tag,
+                  uint8_t flags,
+                  uint32_t arg1,
+                  uint32_t arg2,
+                  uint32_t arg3,
+                  uint32_t arg4,
+                  uint32_t arg5,
+                  uint32_t arg6,
+                  uint32_t arg7,
+                  uint32_t arg8)
+    {
+        m_numArguments = 8;
+        m_packet.init(tag, flags, m_numArguments);
+        m_packet.m_arguments[0] = arg1;
+        m_packet.m_arguments[1] = arg2;
+        m_packet.m_arguments[2] = arg3;
+        m_packet.m_arguments[3] = arg4;
+        m_packet.m_arguments[4] = arg5;
+        m_packet.m_arguments[5] = arg6;
+        m_packet.m_arguments[6] = arg7;
+        m_packet.m_arguments[7] = arg8;
+    }
+
+    //! @brief Constructor that takes four command arguments.
+    CommandPacket(uint8_t tag,
+                  uint8_t flags,
+                  uint32_t arg1,
+                  uint32_t arg2,
+                  uint32_t arg3,
+                  uint32_t arg4,
+                  uint32_t arg5,
+                  uint32_t arg6,
+                  uint32_t arg7,
+                  uint32_t arg8,
+                  uint32_t arg9)
+    {
+        m_numArguments = 9;
+        m_packet.init(tag, flags, m_numArguments);
+        m_packet.m_arguments[0] = arg1;
+        m_packet.m_arguments[1] = arg2;
+        m_packet.m_arguments[2] = arg3;
+        m_packet.m_arguments[3] = arg4;
+        m_packet.m_arguments[4] = arg5;
+        m_packet.m_arguments[5] = arg6;
+        m_packet.m_arguments[6] = arg7;
+        m_packet.m_arguments[7] = arg8;
+        m_packet.m_arguments[8] = arg9;
     }
 
     //! @brief Get size of command packet, including arguments.
@@ -687,6 +822,7 @@ public:
 
         //! @brief Finalize processing.
         virtual void finalize() {}
+
     protected:
         std::string m_filePath; //!< Data file path.
         FILE *m_filePointer;    //!< Data file pointer.
@@ -707,12 +843,29 @@ public:
         //! @brief Constructor.
         StdOutDataConsumer()
             : m_currentCount(1)
+            , m_dataCacheCount(0)
         {
         }
 
         //! @brief Finalize processing.
         virtual void finalize()
         {
+            if (m_dataCacheCount)
+            {
+                for (int i = 0; i < m_dataCacheCount; ++i)
+                {
+                    printf("%02x", m_dataCache[i]);
+                    if ((m_currentCount++ % kBytesPerLine) == 0)
+                    {
+                        printf("\n");
+                    }
+                    else
+                    {
+                        printf(" ");
+                    }
+                }
+                m_dataCacheCount = 0;
+            }
             if (((m_currentCount - 1) % kBytesPerLine) != 0)
             {
                 // Fill space to clean the progress text.
@@ -728,15 +881,19 @@ public:
         virtual void processData(const uint8_t *data, uint32_t size);
 
     protected:
-        uint32_t m_currentCount; //!< Current byte being processed, starts at 1
+        uint32_t m_currentCount;            //!< Current byte being processed, starts at 1
+        uint8_t m_dataCache[kBytesPerLine]; //!< Cache the non-kBytesPerLine-aligned data.
+        uint8_t m_dataCacheCount;           //!< Count in bytes of the cached data.
     };
 
 public:
     //! @brief Constructor that takes a DataProducer.
-    DataPacket(DataProducer *dataProducer)
+    DataPacket(DataProducer *dataProducer, uint32_t packetSize = kDefaultMaxPacketSize)
     {
         assert(dataProducer);
         m_dataProducer = dataProducer;
+        m_dataConsumer = NULL;
+        m_packetSize = packetSize;
     }
 
     //! @brief Constructor that takes a DataConsumer.
@@ -744,12 +901,16 @@ public:
     {
         assert(dataConsumer);
         m_dataConsumer = dataConsumer;
+        m_dataProducer = NULL;
+        m_packetSize = kDefaultMaxPacketSize; /* In fact m_packetSize is not used for Data consumer. */
     }
 
     //! @brief Send data packet to device.
     //!
     //! Calls the data provide to get the data to send.
     uint8_t *sendTo(Packetizer &device, uint32_t *bytesWritten, Progress *progress);
+    //! Calls the data provide to get the data to send.
+    uint8_t *sendTo(Packetizer &device, uint32_t *bytesWritten, Progress *progress, bool hasResponse);
 
     //! @brief Receive data packet from device.
     //!
@@ -757,9 +918,10 @@ public:
     uint8_t *receiveFrom(Packetizer &device, uint32_t *byteCount, Progress *progress);
 
 protected:
-    DataProducer *m_dataProducer;           //!< Provides data for the packet.
-    DataConsumer *m_dataConsumer;           //!< Process the data in the packet.
-    uint8_t m_packet[kMinPacketBufferSize]; //!< The data packet.
+    DataProducer *m_dataProducer;         //!< Provides data for the packet.
+    DataConsumer *m_dataConsumer;         //!< Process the data in the packet.
+    uint8_t m_packet[kMaxHostPacketSize]; //!< The data packet pointer.
+    uint32_t m_packetSize;                //!< The data packet size of current device.
 };
 
 /*!
@@ -806,13 +968,15 @@ public:
     GetProperty(const string_vector_t *argv)
         : Command(argv)
         , m_property(kProperty_Invalid.value, kProperty_Invalid.description)
+        , m_memoryIdorIndex(kMemoryInternal)
     {
     }
 
     //! @brief Constructor that takes a property_t argument.
-    GetProperty(property_t property)
+    GetProperty(property_t property, uint32_t memoryIdorIndex = kMemoryInternal /*Default: internal memory or index 0*/)
         : Command(kCommand_GetProperty.name)
         , m_property(property)
+        , m_memoryIdorIndex(memoryIdorIndex)
     {
         m_argv.push_back(format_string("0x%08x", property.value));
     }
@@ -835,8 +999,8 @@ protected:
     }
 
 protected:
-    property_t m_property; //!< Property tag.
-    uint32_t m_memoryId;   //!< External memory identifier
+    property_t m_property;      //!< Property tag.
+    uint32_t m_memoryIdorIndex; //!< External memory identifier
 };
 
 /*!
@@ -848,6 +1012,8 @@ public:
     //! @brief Constructor that takes an argument vector.
     SetProperty(const string_vector_t *argv)
         : Command(argv)
+        , m_propertyTag(kProperty_Invalid.value)
+        , m_propertyValue(0)
     {
     }
 
@@ -889,17 +1055,22 @@ public:
     //! @brief Constructor that takes an argument vector.
     FlashEraseRegion(const string_vector_t *argv)
         : Command(argv)
+        , m_startAddress(0)
+        , m_byteCount(0)
+        , m_memoryId(kMemoryInternal)
     {
     }
 
     //! @brief Constructor that takes a start and length arguments.
-    FlashEraseRegion(uint32_t start, uint32_t length)
+    FlashEraseRegion(uint32_t start, uint32_t length, uint32_t memoryId)
         : Command(kCommand_FlashEraseRegion.name)
         , m_startAddress(start)
         , m_byteCount(length)
+        , m_memoryId(memoryId)
     {
         m_argv.push_back(format_string("0x%08x", start));
         m_argv.push_back(format_string("0x%08x", length));
+        m_argv.push_back(format_string("%d", memoryId));
     }
 
     //! @brief Initialize.
@@ -919,6 +1090,7 @@ protected:
 protected:
     uint32_t m_startAddress; //!< Starting address in flash.
     uint32_t m_byteCount;    //!< Number of bytes to erase.
+    uint32_t m_memoryId;     //!< Memory Device ID.
 };
 
 /*!
@@ -930,6 +1102,7 @@ public:
     //! @brief Constructor that takes an argument vector.
     FlashEraseAll(const string_vector_t *argv)
         : Command(argv)
+        , m_memoryId(kMemoryInternal)
     {
     }
 
@@ -993,6 +1166,70 @@ protected:
 };
 
 /*!
+ * @brief Represents the bootloader Generate Key Blob command.
+ */
+class GenerateKeyBlob : public Command
+{
+public:
+    //! @brief Constructor that takes an argument vector.
+    GenerateKeyBlob(const string_vector_t *argv)
+        : Command(argv)
+        , m_fileDek()
+        , m_fileKeyBlob()
+        , m_keySel(0)
+        , m_count(0)
+        , m_dataPhase(0)
+    {
+    }
+
+    //! @brief Constructor
+    GenerateKeyBlob()
+        : Command(kCommand_GenerateKeyBlob.name)
+        , m_fileDek()
+        , m_fileKeyBlob()
+        , m_keySel(0)
+        , m_count(0)
+        , m_dataPhase(0)
+    {
+        m_argv.push_back(m_fileDek);
+        m_argv.push_back(m_fileKeyBlob);
+    }
+
+    //! @brief master key selection for generate-key-blob.
+    enum
+    {
+        kKeySource_SNVS_OTPMK = 0,     /*!< OTPMK from FUSE is used as KEK */
+        kKeySource_SNVS_OTPMK_Sub = 1, /*!< 2nd enum value for OTPMK, the same effect with kKeySource_SNVS_OTPMK */
+        kKeySource_SNVS_ZMK = 2,       /*!< ZMK from SVNS is used as KEK  */
+        kKeySource_SNVS_CMK = 3,       /*!< CMK from SVNS is used as KEK  */
+    };
+
+    //! @brief Initialize.
+    virtual bool init();
+
+    //! @brief Send command to packetizer.
+    virtual void sendTo(Packetizer &packetizer);
+
+protected:
+    //! @brief Check response packet.
+    virtual bool processResponse(const generate_key_blob_response_packet_t *packet);
+    //! @brief Check response packet.
+
+    virtual bool processResponse(const uint8_t *packet)
+    {
+        return Command::processResponse(reinterpret_cast<const generic_response_packet_t *>(packet),
+                                        kCommandTag_GenerateKeyBlob);
+    }
+
+protected:
+    std::string m_fileDek;     //!< DEK key Data file path.
+    std::string m_fileKeyBlob; //!< Key Blob Data file path.
+    uint32_t m_keySel;         //!< KEK source selected to generate the blob.
+    uint32_t m_count;
+    uint32_t m_dataPhase;
+};
+
+/*!
  * @brief Represents the bootloader Read Memory command.
  */
 class ReadMemory : public Command
@@ -1001,7 +1238,10 @@ public:
     //! @brief Constructor that takes an argument vector.
     ReadMemory(const string_vector_t *argv)
         : Command(argv)
+        , m_startAddress(0)
+        , m_byteCount(0)
         , m_dataFile()
+        , m_memoryId(kMemoryInternal)
     {
     }
 
@@ -1026,6 +1266,7 @@ protected:
     std::string m_dataFile;  //!< Data file path.
     uint32_t m_startAddress; //!< Destination memory address.
     uint32_t m_byteCount;    //!< Number of bytes to read.
+    uint32_t m_memoryId;     //!< Memory device ID.
 };
 
 /*!
@@ -1042,33 +1283,38 @@ public:
         , m_startAddress(0)
         , m_count(0)
         , m_data()
+        , m_memoryId(kMemoryInternal)
     {
     }
 
     //! @brief Constructor that takes an DataSource::Segment argument
-    WriteMemory(blfwk::DataSource::Segment *segment)
+    WriteMemory(blfwk::DataSource::Segment *segment, uint32_t memoryId)
         : Command(kCommand_WriteMemory.name)
         , m_fileOrData()
         , m_segment(segment)
         , m_count(0)
         , m_data()
+        , m_memoryId(memoryId)
     {
         m_startAddress = segment->getBaseAddress();
         m_argv.push_back(format_string("0x%08x", m_startAddress));
         m_argv.push_back(m_fileOrData);
+        m_argv.push_back(format_string("%d", memoryId));
     }
 
     //! @brief Constructor that takes an uchar_vector_t argument
-    WriteMemory(uint32_t address, const uchar_vector_t &data)
+    WriteMemory(uint32_t address, const uchar_vector_t &data, uint32_t memoryId)
         : Command(kCommand_WriteMemory.name)
         , m_fileOrData()
         , m_segment(NULL)
         , m_startAddress(address)
         , m_count(0)
         , m_data(data)
+        , m_memoryId(memoryId)
     {
         m_argv.push_back(format_string("0x%08x", m_startAddress));
         m_argv.push_back(m_fileOrData);
+        m_argv.push_back(format_string("%d", memoryId));
     }
 
     //! @brief Initialize.
@@ -1091,6 +1337,7 @@ protected:
     uint32_t m_startAddress;               //!< Destination memory address.
     uint32_t m_count;                      //!< Number of bytes to write.
     uchar_vector_t m_data;                 //!< The data to write to the device.
+    uint32_t m_memoryId;                   //!< Memory device ID
 };
 
 /*!
@@ -1102,6 +1349,9 @@ public:
     //! @brief Constructor that takes an argument vector.
     FillMemory(const string_vector_t *argv)
         : Command(argv)
+        , m_startAddress(0)
+        , m_byteCount(0)
+        , m_patternWord(0xFFFFFFFF)
     {
     }
 
@@ -1164,6 +1414,151 @@ protected:
 };
 
 /*!
+ * @brief Represents the bootloader Fuse Program command.
+ */
+class FuseProgram : public Command
+{
+public:
+    //! @brief Constructor that takes an argument vector.
+    FuseProgram(const string_vector_t *argv)
+        : Command(argv)
+        , m_fileOrData()
+        , m_segment(NULL)
+        , m_startAddress(0)
+        , m_count(0)
+        , m_data()
+        , m_memoryId(kMemoryInternal)
+    {
+    }
+
+    //! @brief Constructor that takes an DataSource::Segment argument
+    FuseProgram(blfwk::DataSource::Segment *segment, uint32_t memoryId)
+        : Command(kCommand_WriteMemory.name)
+        , m_fileOrData()
+        , m_segment(segment)
+        , m_count(0)
+        , m_data()
+        , m_memoryId(memoryId)
+    {
+        m_startAddress = segment->getBaseAddress();
+        m_argv.push_back(format_string("0x%08x", m_startAddress));
+        m_argv.push_back(m_fileOrData);
+        m_argv.push_back(format_string("%d", memoryId));
+    }
+
+    //! @brief Constructor that takes an uchar_vector_t argument
+    FuseProgram(uint32_t address, const uchar_vector_t &data, uint32_t memoryId)
+        : Command(kCommand_WriteMemory.name)
+        , m_fileOrData()
+        , m_segment(NULL)
+        , m_startAddress(address)
+        , m_count(0)
+        , m_data(data)
+        , m_memoryId(memoryId)
+    {
+        m_argv.push_back(format_string("0x%08x", m_startAddress));
+        m_argv.push_back(m_fileOrData);
+        m_argv.push_back(format_string("%d", memoryId));
+    }
+
+    //! @brief Initialize.
+    virtual bool init();
+
+    //! @brief Send command to packetizer.
+    virtual void sendTo(Packetizer &packetizer);
+
+protected:
+    //! @brief Check response packet.
+    virtual bool processResponse(const uint8_t *packet)
+    {
+        return Command::processResponse(reinterpret_cast<const generic_response_packet_t *>(packet),
+                                        kCommandTag_FuseProgram);
+    }
+
+protected:
+    std::string m_fileOrData;              //!< Data file path or hex data string.
+    blfwk::DataSource::Segment *m_segment; //!< DataSource segment (instead of file or hex string).
+    uint32_t m_startAddress;               //!< Destination memory address.
+    uint32_t m_count;                      //!< Number of bytes to write.
+    uchar_vector_t m_data;                 //!< The data to write to the device.
+    uint32_t m_memoryId;                   //!< Memory device ID
+};
+
+/*!
+ * @brief Represents the bootloader Fuse Read command.
+ */
+class FuseRead : public Command
+{
+public:
+    //! @brief Constructor that takes an argument vector.
+    FuseRead(const string_vector_t *argv)
+        : Command(argv)
+        , m_startAddress(0)
+        , m_byteCount(0)
+        , m_dataFile()
+        , m_memoryId(kMemoryInternal)
+    {
+    }
+
+    //! @brief Initialize.
+    virtual bool init();
+
+    //! @brief Send command to packetizer.
+    virtual void sendTo(Packetizer &packetizer);
+
+protected:
+    //! @brief Check response packet.
+    virtual bool processResponse(const read_memory_response_packet_t *packet);
+
+    //! @brief Check generic response packet.
+    virtual bool processResponse(const uint8_t *packet)
+    {
+        return Command::processResponse(reinterpret_cast<const generic_response_packet_t *>(packet),
+                                        kCommandTag_FuseRead);
+    }
+
+protected:
+    std::string m_dataFile;  //!< Data file path.
+    uint32_t m_startAddress; //!< Destination memory address.
+    uint32_t m_byteCount;    //!< Number of bytes to read.
+    uint32_t m_memoryId;     //!< Memory device ID.
+};
+
+/*!
+ * @brief Represents the bootloader Load Image command.
+ */
+class LoadImage : public Command
+{
+public:
+    //! @brief Constructor that takes an argument vector.
+    LoadImage(const string_vector_t *argv)
+        : Command(argv)
+        , m_dataFile()
+    {
+    }
+
+    //! @brief Constructor that takes a filename argument.
+    LoadImage(const char *const filename)
+        : Command(kCommand_LoadImage.name)
+        , m_dataFile(filename)
+    {
+    }
+
+    //! @brief Initialize.
+    virtual bool init();
+
+    //! @brief Send command to packetizer.
+    virtual void sendTo(Packetizer &packetizer);
+
+protected:
+    //! @brief Check response packet.
+    virtual bool processResponse(const uint8_t *packet);
+
+protected:
+    std::string m_dataFile; //!< SB file path.
+};
+
+/*!
  * @brief Represents the bootloader Execute command.
  */
 class Execute : public Command
@@ -1172,6 +1567,9 @@ public:
     //! @brief Constructor that takes an argument vector.
     Execute(const string_vector_t *argv)
         : Command(argv)
+        , m_jumpAddress(0)
+        , m_wordArgument(0)
+        , m_stackpointer(0)
     {
     }
 
@@ -1216,6 +1614,8 @@ public:
     //! @brief Constructor that takes an argument vector.
     Call(const string_vector_t *argv)
         : Command(argv)
+        , m_callAddress(0)
+        , m_wordArgument(0)
     {
     }
 
@@ -1246,6 +1646,8 @@ public:
     //! @brief Constructor that takes an argument vector.
     FlashSecurityDisable(const string_vector_t *argv)
         : Command(argv)
+        , m_keyHigh(0)
+        , m_keyLow(0)
     {
     }
 
@@ -1285,16 +1687,22 @@ public:
     //! @brief Constructor that takes an argument vector.
     FlashProgramOnce(const string_vector_t *argv)
         : Command(argv)
+        , m_index(0)
+        , m_byteCount(0)
+        , m_dataLow(0)
+        , m_dataHigh(0)
+        , m_lsb(true)
     {
     }
 
     //! @brief Constructor that takes arguments.
-    FlashProgramOnce(uint32_t index, uint32_t byteCount, uint32_t dataLow, uint32_t dataHigh)
+    FlashProgramOnce(uint32_t index, uint32_t byteCount, uint32_t dataLow, uint32_t dataHigh, bool isLsb = true)
         : Command(kCommand_FlashProgramOnce.name)
         , m_index(index)
         , m_byteCount(byteCount)
         , m_dataLow(dataLow)
         , m_dataHigh(dataHigh)
+        , m_lsb(isLsb)
     {
     }
 
@@ -1317,6 +1725,7 @@ protected:
     uint32_t m_byteCount; //!< Number of bytes to be programmed.
     uint32_t m_dataLow;   //!< Bytes 0-3 of the data to be written.
     uint32_t m_dataHigh;  //!< Bytes 4-7 of the data to be written.
+    bool m_lsb;           //!< Sending sequence of the data.
 };
 
 /*!
@@ -1328,6 +1737,8 @@ public:
     //! @brief Constructor that takes an argument vector.
     FlashReadOnce(const string_vector_t *argv)
         : Command(argv)
+        , m_index(0)
+        , m_byteCount(0)
     {
     }
 
@@ -1363,6 +1774,9 @@ public:
     FlashReadResource(const string_vector_t *argv)
         : Command(argv)
         , m_dataFile()
+        , m_startAddress(0)
+        , m_byteCount(0)
+        , m_option(0)
     {
     }
 
@@ -1393,12 +1807,14 @@ protected:
 /*!
  * @brief Represents the bootloader Configure QuadSpi command.
  */
-class ConfigureQuadSpi : public Command
+class ConfigureMemory : public Command
 {
 public:
     //! @brief Constructor that takes an argument vector.
-    ConfigureQuadSpi(const string_vector_t *argv)
+    ConfigureMemory(const string_vector_t *argv)
         : Command(argv)
+        , m_memoryId(kMemoryInternal)
+        , m_configBlockAddress(0)
     {
     }
 
@@ -1413,23 +1829,24 @@ protected:
     virtual bool processResponse(const uint8_t *packet)
     {
         return Command::processResponse(reinterpret_cast<const generic_response_packet_t *>(packet),
-                                        kCommandTag_ConfigureQuadSpi);
+                                        kCommandTag_ConfigureMemory);
     }
 
 protected:
-    uint32_t m_flashMemId;         //!< Flash memory ID.
-    uint32_t m_configBlockAddress; //!< Qspi config block address (in RAM or in internal Flash).
+    uint32_t m_memoryId;           //!< Memory ID.
+    uint32_t m_configBlockAddress; //!< Config block address (in RAM or in internal Flash).
 };
 
 /*!
-* @brief Represents the bootloader Reliable Update command.
-*/
+ * @brief Represents the bootloader Reliable Update command.
+ */
 class ReliableUpdate : public Command
 {
 public:
     //! @brief Constructor that takes an argument vector.
     ReliableUpdate(const string_vector_t *argv)
         : Command(argv)
+        , m_address(0)
     {
     }
 
@@ -1452,6 +1869,84 @@ protected:
 };
 
 /*!
+ * @brief Represents the bootloader Key Provisioning command.
+ */
+class KeyProvisioning : public Command
+{
+public:
+    //! @brief Constructor that takes an argument vector.
+    KeyProvisioning(const string_vector_t *argv)
+        : Command(argv)
+        , m_operation(0)
+        , m_type(0)
+        , m_size(0)
+        , m_memoryId(0)
+    {
+    }
+
+    //! @brief Initialize.
+    virtual bool init();
+
+    //! @brief Send command to packetizer.
+    virtual void sendTo(Packetizer &packetizer);
+
+    void sendCmdAndData(Packetizer &device);
+
+    void sendCmdAndGetData(Packetizer &device);
+
+protected:
+    //! @brief Check response packet.
+    virtual bool processResponse(const key_provisioning_response_packet_t *packet);
+
+    virtual bool processResponse(const uint8_t *packet)
+    {
+        return Command::processResponse(reinterpret_cast<const generic_response_packet_t *>(packet),
+                                        kCommandTag_KeyProvisioning);
+    }
+
+protected:
+    uint32_t m_operation; //!< Key Provisioning Operation.
+    uint32_t m_type;
+    uint32_t m_memoryId;
+    uint32_t m_size;
+    string m_fileOrData;
+};
+
+/*!
+ * @brief Represents the bootloader TrustProvisioning command.
+ */
+class TrustProvisioning : public Command
+{
+public:
+    //! @brief Constructor that takes an argument vector.
+    TrustProvisioning(const string_vector_t *argv)
+        : Command(argv)
+        , m_operation(0)
+    {
+    }
+
+    //! @brief Initialize.
+    virtual bool init();
+
+    //! @brief Send command to packetizer.
+    virtual void sendTo(Packetizer &packetizer);
+
+protected:
+    //! @brief Check response packet.
+    virtual bool processResponse(const trust_provisioning_response_packet_t *packet);
+
+    virtual bool processResponse(const uint8_t *packet)
+    {
+        return Command::processResponse(reinterpret_cast<const generic_response_packet_t *>(packet),
+                                        kCommandTag_TrustProvisioning);
+    }
+
+protected:
+    uint32_t m_operation;               //!< Trust Provisioning Operation.
+    trust_provisioning_parms_t m_parms; //!< Parameters of Trust Provsioing Operation.
+};
+
+/*!
  * @brief Represents the Flash Image command used for downloading formatted file.
  */
 class FlashImage : public Command
@@ -1463,20 +1958,21 @@ public:
         , m_fileName()
         , m_sourceFile(NULL)
         , m_doEraseOpt(false)
-        , m_sectorSize()
+        , m_memoryId(kMemoryInternal)
     {
     }
 
     //! @brief Constructor that takes a SourceFile argument
-    FlashImage(SourceFile *sourceFile, bool doEraseOpt)
+    FlashImage(SourceFile *sourceFile, bool doEraseOpt, uint32_t memoryId)
         : Command(kCommand_FlashImage.name)
         , m_fileName()
         , m_sourceFile(sourceFile)
         , m_doEraseOpt(doEraseOpt)
-        , m_sectorSize()
+        , m_memoryId(memoryId)
     {
         m_argv.push_back(m_sourceFile->getPath());
         m_argv.push_back(doEraseOpt ? "erase" : "none");
+        m_argv.push_back(format_string("%d", memoryId));
     }
 
     //! @brief Initialize.
@@ -1486,10 +1982,10 @@ public:
     virtual void sendTo(Packetizer &packetizer);
 
 protected:
-    uint32_t m_sectorSize;    //!< Flash sector size of current target.
     std::string m_fileName;   //!< Image file name with full path.
     SourceFile *m_sourceFile; //!< Sourcefile object containing the data and addresses.
     bool m_doEraseOpt;        //!< Detemine if doing erase operation before writting image file to flash.
+    uint32_t m_memoryId;      //!< Memory device ID.
 };
 
 /*!
@@ -1501,6 +1997,8 @@ public:
     //! @brief Constructor that takes an argument vector.
     ConfigureI2c(const string_vector_t *argv)
         : Command(argv)
+        , i2cAddress(0x10)
+        , i2cSpeedKHz(100)
     {
     }
 
@@ -1519,8 +2017,8 @@ protected:
     }
 
 protected:
-    uint8_t i2cAddress = 0x10;
-    uint32_t i2cSpeedKHz = 100;
+    uint8_t i2cAddress;
+    uint32_t i2cSpeedKHz;
 };
 
 /*!
@@ -1532,6 +2030,10 @@ public:
     //! @brief Constructor that takes an argument vector.
     ConfigureSpi(const string_vector_t *argv)
         : Command(argv)
+        , spiSpeedKHz(100)
+        , spiPolarity(BusPal::kSpiClockPolarity_ActiveLow)
+        , spiPhase(BusPal::kSpiClockPhase_SecondEdge)
+        , spiDirection(BusPal::kSpiMsbFirst)
     {
     }
 
@@ -1550,10 +2052,10 @@ protected:
     }
 
 protected:
-    uint32_t spiSpeedKHz = 100;
-    BusPal::spi_clock_polarity_t spiPolarity = BusPal::kSpiClockPolarity_ActiveLow;
-    BusPal::spi_clock_phase_t spiPhase = BusPal::kSpiClockPhase_SecondEdge;
-    BusPal::spi_shift_direction_t spiDirection = BusPal::kSpiMsbFirst;
+    uint32_t spiSpeedKHz;
+    BusPal::spi_clock_polarity_t spiPolarity;
+    BusPal::spi_clock_phase_t spiPhase;
+    BusPal::spi_shift_direction_t spiDirection;
 };
 
 /*!
@@ -1565,6 +2067,9 @@ public:
     //! @brief Constructor that takes an argument vector.
     ConfigureCan(const string_vector_t *argv)
         : Command(argv)
+        , canSpeed(4)
+        , canTxid(0x321)
+        , canRxid(0x123)
     {
     }
 
@@ -1583,9 +2088,38 @@ protected:
     }
 
 protected:
-    uint32_t canSpeed = 4;
-    uint32_t canTxid = 0x321;
-    uint32_t canRxid = 0x123;
+    uint32_t canSpeed;
+    uint32_t canTxid;
+    uint32_t canRxid;
+};
+
+/*!
+ * @brief Represents the ListMemory command used to list all memories available on current target device
+ */
+class ListMemory : public Command
+{
+public:
+    //! @brief Constructor that takes an argument vector.
+    ListMemory(const string_vector_t *argv)
+        : Command(argv)
+    {
+    }
+
+    //! @brief Constructor that takes a SourceFile argument
+    ListMemory(void)
+        : Command(kCommand_FlashImage.name)
+    {
+    }
+
+    //! @brief Initialize.
+    virtual bool init();
+
+    //! @brief Send command to packetizer.
+    virtual void sendTo(Packetizer &packetizer);
+
+protected:
+    // No processResponse here.
+    // Command sequence doesn't need to process response.
 };
 
 //@}

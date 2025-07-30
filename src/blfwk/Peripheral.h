@@ -1,39 +1,18 @@
 /*
- * Copyright (c) 2013-14, Freescale Semiconductor, Inc.
+ * Copyright (c) 2013-2014 Freescale Semiconductor, Inc.
+ * Copyright 2020 - 2022 NXP
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #ifndef _Peripheral_h_
 #define _Peripheral_h_
 
+#include <string.h>
 #include "BusPal.h"
+#include "LpcUsbSio.h"
 #include "bootloader_common.h"
-#include <string>
 
 //! @addtogroup host_peripherals
 //! @{
@@ -53,21 +32,32 @@ public:
         kHostPeripheralType_None,
         kHostPeripheralType_UART,
         kHostPeripheralType_BUSPAL_UART,
+        kHostPeripheralType_LPCUSBSIO,
         kHostPeripheralType_USB_HID,
-        kHostPeripheralType_SIM
+        kHostPeripheralType_SIM,
+        kHostPeripheralType_I2C,
+        kHostPeripheralType_SPI,
     };
 
     struct PeripheralConfigData
     {
         _host_peripheral_types peripheralType;
+        bool ping;
         std::string comPortName;
         long comPortSpeed;
         uint32_t packetTimeoutMs;
         unsigned short usbHidVid;
         unsigned short usbHidPid;
         std::string usbHidSerialNumber;
-        bool ping;
+        std::string usbPath;
+#if defined(LINUX) && defined(__ARM__)
+        unsigned char i2cAddress;
+        unsigned char spiPolarity;
+        unsigned char spiPhase;
+        unsigned char spiSequence;
+#endif // #if defined(LINUX) && defined(__ARM__)
         BusPal::BusPalConfigData busPalConfig;
+        LpcUsbSio::LpcUsbSioConfigData lpcUsbSioConfig;
     };
 
     virtual ~Peripheral(){};
@@ -82,6 +72,9 @@ public:
 
     //! @brief Write bytes.
     virtual status_t write(const uint8_t *buffer, uint32_t byteCount) = 0;
+
+    //! @brief Return peripheral Type
+    virtual _host_peripheral_types get_type(void) = 0;
 };
 
 } // namespace blfwk

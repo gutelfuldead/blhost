@@ -18,6 +18,6 @@ WORKDIR /lauszus-blhost
 COPY . .
 
 # Build the blhost binary
-RUN make -C validation/blhost/gcc -j1 && \
-    strip validation/blhost/gcc/Release/blhost
+RUN make -C tools/blhost/gcc -j1 && \
+    strip tools/blhost/gcc/Release/blhost
 

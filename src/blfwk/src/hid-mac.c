@@ -278,7 +278,7 @@ static int get_string_property(IOHIDDeviceRef device, CFStringRef prop, wchar_t 
 {
     CFStringRef str = IOHIDDeviceGetProperty(device, prop);
 
-    memset(buf, 0, len);
+    buf[0] = 0x0000;
 
     if (str)
     {
@@ -287,6 +287,7 @@ static int get_string_property(IOHIDDeviceRef device, CFStringRef prop, wchar_t 
         range.length = CFStringGetLength(str);
         CFIndex used_buf_len;
         CFStringGetBytes(str, range, kCFStringEncodingUTF32LE, (char)'?', FALSE, (UInt8 *)buf, len, &used_buf_len);
+        buf[used_buf_len] = 0x00000000;
         return used_buf_len;
     }
     else
@@ -297,7 +298,7 @@ static int get_string_property_utf8(IOHIDDeviceRef device, CFStringRef prop, cha
 {
     CFStringRef str = IOHIDDeviceGetProperty(device, prop);
 
-    memset(buf, 0, len);
+    buf[0] = 0x0000;
 
     if (str)
     {
@@ -306,6 +307,7 @@ static int get_string_property_utf8(IOHIDDeviceRef device, CFStringRef prop, cha
         range.length = CFStringGetLength(str);
         CFIndex used_buf_len;
         CFStringGetBytes(str, range, kCFStringEncodingUTF8, (char)'?', FALSE, (UInt8 *)buf, len, &used_buf_len);
+        buf[used_buf_len] = 0x00000000;
         return used_buf_len;
     }
     else
@@ -365,10 +367,12 @@ static int init_hid_manager(void)
 
     /* Initialize all the HID Manager Objects */
     hid_mgr = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
+    if (!hid_mgr)
+        return -1;
+
     IOHIDManagerSetDeviceMatching(hid_mgr, NULL);
     IOHIDManagerScheduleWithRunLoop(hid_mgr, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
-    res = IOHIDManagerOpen(hid_mgr, kIOHIDOptionsTypeNone);
-    return (res == kIOReturnSuccess) ? 0 : -1;
+    return 0;
 }
 
 int HID_API_EXPORT hid_init(void)
@@ -389,7 +393,6 @@ int HID_API_EXPORT hid_exit(void)
     if (hid_mgr)
     {
         /* Close the HID manager. */
-        IOHIDManagerClose(hid_mgr, kIOHIDOptionsTypeNone);
         CFRelease(hid_mgr);
         hid_mgr = NULL;
     }
@@ -407,7 +410,10 @@ struct hid_device_info HID_API_EXPORT *hid_enumerate(unsigned short vendor_id, u
     setlocale(LC_ALL, "");
 
     /* Set up the HID Manager if it hasn't been done */
-    hid_init();
+    if (hid_init() < 0)
+    {
+        return NULL;
+    }
 
     /* Get a list of the Devices */
     CFSetRef device_set = IOHIDManagerCopyDevices(hid_mgr);
@@ -713,7 +719,10 @@ hid_device *HID_API_EXPORT hid_open_path(const char *path)
     dev = new_hid_device();
 
     /* Set up the HID Manager if it hasn't been done */
-    hid_init();
+    if (hid_init() < 0)
+		{
+        return NULL;
+    }
 
     CFSetRef device_set = IOHIDManagerCopyDevices(hid_mgr);
 
@@ -819,6 +828,11 @@ static int set_report(hid_device *dev, IOHIDReportType type, const unsigned char
 int HID_API_EXPORT hid_write_timeout(hid_device *dev, const unsigned char *data, size_t length, int milliseconds)
 {
     return set_report(dev, kIOHIDReportTypeOutput, data, length);
+}
+
+int HID_API_EXPORT HID_API_CALL hid_write(hid_device *dev, const unsigned char *data, size_t length)
+{
+    return hid_write_timeout(dev, data, length, (dev->blocking) ? -1 : 0);
 }
 
 /* Helper function, so that this isn't duplicated in hid_read(). */

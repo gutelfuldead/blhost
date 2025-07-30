@@ -1,40 +1,18 @@
 /*
- * Copyright (c) 2013-2016, Freescale Semiconductor, Inc.
+ * Copyright (c) 2013-2015 Freescale Semiconductor, Inc.
+ * Copyright 2016-2020 NXP
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
+ * SPDX-License-Identifier: BSD-3-Clause
  *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "blfwk/Command.h"
+#include "blfwk/EndianUtilities.h"
 #include "blfwk/Logging.h"
-#include "bootloader_common.h"
 #include "blfwk/json.h"
 #include "blfwk/utils.h"
-#include "sbloader/sbloader.h"
-#include "bootloader/bootloader.h"
+#include "bootloader_common.h"
 #ifdef LINUX
 #include <string.h>
 #endif
@@ -74,6 +52,17 @@ StatusMessageTableEntry blfwk::g_statusCodes[] = {
     { 106 /*kStatus_FlashUnknownProperty*/, "kStatus_FlashUnknownProperty" },
     { 108 /*kStatus_FlashRegionExecuteOnly*/, "kStatus_FlashRegionExecuteOnly" },
     { 109 /*kStatus_FlashExecuteInRamFunctionNotReady*/, "kStatus_FlashExecuteInRamFunctionNotReady" },
+    { 111 /*kStatus_FLASH_CommandNotSupported*/, "kStatus_FLASH_CommandNotSupported" },
+    { 132 /*kStatus_FLASH_OutOfDateCfpaPage*/, "kStatus_FLASH_OutOfDateCfpaPage" },
+    { 133 /*kStatus_FLASH_BlankIfrPageData*/, "kStatus_FLASH_BlankIfrPageData" },
+    { 134 /*kStatus_FLASH_EncryptedRegionsEraseNotDoneAtOnce*/, "kStatus_FLASH_EncryptedRegionsEraseNotDoneAtOnce" },
+    { 135 /*kStatus_FLASH_ProgramVerificationNotAllowed*/, "kStatus_FLASH_ProgramVerificationNotAllowed" },
+    { 136 /*kStatus_FLASH_HashCheckError*/, "kStatus_FLASH_HashCheckError" },
+    { 137 /*kStatus_FLASH_SealedFfrRegion*/, "kStatus_FLASH_SealedFfrRegion" },
+    { 138 /*kStatus_FLASH_FfrRegionWriteBroken*/, "kStatus_FLASH_FfrRegionWriteBroken" },
+    { 139 /*kStatus_FLASH_NmpaUpdateNotAllowed*/, "kStatus_FLASH_NmpaUpdateNotAllowed" },
+    { 140 /*kStatus_FLASH_CmpaCfgDirectEraseNotAllowed*/, "kStatus_FLASH_CmpaCfgDirectEraseNotAllowed" },
+    { 141 /*kStatus_FLASH_FfrBankIsLocked*/, "kStatus_FLASH_FfrBankIsLocked" },
 
     // I2C driver errors.
     { 200 /*kStatus_I2C_SlaveTxUnderrun*/, "I2C Slave TX Underrun error." },
@@ -101,6 +90,46 @@ StatusMessageTableEntry blfwk::g_statusCodes[] = {
     { 502 /*kStatus_OtfadInvalidKey*/, "OTFAD Invalid Key." },
     { 503 /*Kstatus_OtfadInvalidKeyBlob*/, "OTFAD Invalid KeyBlob." },
 
+    // SDMMC driver errors.
+    { 1800 /*kStatus_SDMMC_NotSupportYet*/, "Haven't supported" },
+    { 1801 /*kStatus_SDMMC_TransferFailed*/, " Send command failed" },
+    { 1802 /*kStatus_SDMMC_SetCardBlockSizeFailed*/, " Set block size failed" },
+    { 1803 /*kStatus_SDMMC_HostNotSupport*/, "Host doesn't support" },
+    { 1804 /*kStatus_SDMMC_CardNotSupport*/, "Card doesn't support" },
+    { 1805 /*kStatus_SDMMC_AllSendCidFailed*/, "Send CID failed" },
+    { 1806 /*kStatus_SDMMC_SendRelativeAddressFailed*/, "Send relative address failed" },
+    { 1807 /*kStatus_SDMMC_SendCsdFailed*/, "Send CSD failed" },
+    { 1808 /*kStatus_SDMMC_SelectCardFailed*/, "Select card failed" },
+    { 1809 /*kStatus_SDMMC_SendScrFailed*/, "Send SCR failed" },
+    { 1810 /*kStatus_SDMMC_SetDataBusWidthFailed*/, "Set bus width failed" },
+    { 1811 /*kStatus_SDMMC_GoIdleFailed*/, "Go idle failed" },
+    { 1812 /*kStatus_SDMMC_HandShakeOperationConditionFailed*/, "Send Operation Condition failed" },
+    { 1813 /*kStatus_SDMMC_SendApplicationCommandFailed*/, "Send application command failed" },
+    { 1814 /*kStatus_SDMMC_SwitchFailed*/, "Switch command failed" },
+    { 1815 /*kStatus_SDMMC_StopTransmissionFailed*/, "Stop transmission failed" },
+    { 1816 /*kStatus_SDMMC_WaitWriteCompleteFailed*/, "Wait write complete failed" },
+    { 1817 /*kStatus_SDMMC_SetBlockCountFailed*/, "Set block count failed" },
+    { 1818 /*kStatus_SDMMC_SetRelativeAddressFailed*/, "Set relative address failed" },
+    { 1819 /*kStatus_SDMMC_SwitchBusTimingFailed*/, "Switch high speed failed" },
+    { 1820 /*kStatus_SDMMC_SendExtendedCsdFailed*/, "Send EXT_CSD failed" },
+    { 1821 /*kStatus_SDMMC_ConfigureBootFailed*/, "Configure boot failed" },
+    { 1822 /*kStatus_SDMMC_ConfigureExtendedCsdFailed*/, "Configure EXT_CSD failed" },
+    { 1823 /*kStatus_SDMMC_EnableHighCapacityEraseFailed*/, "Enable high capacity erase failed" },
+    { 1824 /*kStatus_SDMMC_SendTestPatternFailed*/, "Send test pattern failed" },
+    { 1825 /*kStatus_SDMMC_ReceiveTestPatternFailed*/, "Receive test pattern failed" },
+    { 1826 /*kStatus_SDMMC_SDIO_ResponseError*/, "sdio response error" },
+    { 1827 /*kStatus_SDMMC_SDIO_InvalidArgument*/, "sdio invalid argument response error" },
+    { 1828 /*kStatus_SDMMC_SDIO_SendOperationConditionFail*/, "sdio send operation condition fail" },
+    { 1829 /*kStatus_SDMMC_InvalidVoltage*/, "invaild voltage" },
+    { 1830 /*kStatus_SDMMC_SDIO_SwitchHighSpeedFail*/, "switch to high speed fail" },
+    { 1831 /*kStatus_SDMMC_SDIO_ReadCISFail*/, "read CIS fail" },
+    { 1832 /*kStatus_SDMMC_SDIO_InvalidCard*/, "invaild SDIO card" },
+    { 1833 /*kStatus_SDMMC_TuningFail*/, "tuning fail" },
+    { 1834 /*kStatus_SDMMC_SwitchVoltageFail*/, "switch voltage fail" },
+    { 1835 /*kStatus_SDMMC_ReTuningRequest*/, "retuning request" },
+    { 1836 /*kStatus_SDMMC_SetDriverStrengthFail*/, "set driver strength fail" },
+    { 1837 /*kStatus_SDMMC_SetPowerClassFail*/, "set power class fail" },
+
     // Bootloader errors.
     { kStatus_UnknownCommand, "kStatus_UnknownCommand" },
     { kStatus_SecurityViolation, "Command disallowed when security is enabled." },
@@ -108,6 +137,7 @@ StatusMessageTableEntry blfwk::g_statusCodes[] = {
     { kStatus_Ping, "kStatus_Ping" },
     { kStatus_NoResponse, "No response packet from target device." },
     { kStatus_NoResponseExpected, "No response packet from target device was expected." },
+    { kStatus_CommandUnsupported, " Command is not supported\n" },
 
     // SB loader errors.
     { kStatusRomLdrSectionOverrun, "kStatusRomLdrSectionOverrun" },
@@ -124,17 +154,58 @@ StatusMessageTableEntry blfwk::g_statusCodes[] = {
     { kStatusRomLdrCallFailed, "kStatusRomLdrCallFailed" },
     { kStatusRomLdrKeyNotFound, "kStatusRomLdrKeyNotFound" },
     { kStatusRomLdrSecureOnly, "kStatusRomLdrSecureOnly" },
+    { kStatusRomLdrResetReturned, "kStatusRomLdrResetReturned" },
+    { kStatusRomLdrRollbackBlocked, "kStatusRomLdrRollbackBlocked" },
+    { kStatusRomLdrInvalidSectionMacCount, "kStatusRomLdrInvalidSectionMacCount" },
+    { kStatusRomLdrUnexpectedCommand, "kStatusRomLdrUnexpectedCommand" },
 
     // Memory interface errors.
     { kStatusMemoryRangeInvalid, "kStatusMemoryRangeInvalid" },
     { kStatusMemoryReadFailed, "kStatusMemoryReadFailed" },
     { kStatusMemoryWriteFailed, "kStatusMemoryWriteFailed" },
     { kStatusMemoryCumulativeWrite, "kStatusMemoryCumulativeWrite" },
+    { kStatusMemoryAppOverlapWithExecuteOnlyRegion, "kStatusMemoryAppOverlapWithExecuteOnlyRegion" },
+    { kStatusMemoryNotConfigured, "kStatusMemoryNotConfigured" },
+    { kStatusMemoryAlignmentError, "kStatusMemoryAlignmentError" },
+    { kStatusMemoryVerifyFailed, "kStatusMemoryVerifyFailed" },
+    { kStatusMemoryWriteProtected, "kStatusMemoryWriteProtected" },
+    { kStatusMemoryAddressError, "kStatusMemoryAddressError" },
+    { kStatusMemoryBlankCheckFailed, "kStatusMemoryBlankCheckFailed" },
+    { kStatusMemoryBlankPageReadDisallowed, "kStatusMemoryBlankPageReadDisallowed" },
+    { kStatusMemoryProtectedPageReadDisallowed, "kStatusMemoryProtectedPageReadDisallowed" },
+    { kStatusMemoryUnsupportedCommand, "kStatusMemoryUnsupportedCommand" },
 
     // Property store errors.
     { kStatus_UnknownProperty, "Unknown property." },
     { kStatus_ReadOnlyProperty, "Property is read-only." },
     { kStatus_InvalidPropertyValue, "Invalid property value." },
+
+    /*!< Group number for FLASHIAP status codes */
+    { kStatus_FLASHIAP_InvalidArgument, "kStatus_FLASHIAP_InvalidArgument" },
+    { kStatus_FLASHIAP_UnknownProperty, "kStatus_FLASHIAP_UnknownProperty" },
+    { kStatus_FLASHIAP_AlignmentError, "kStatus_FLASHIAP_AlignmentError" },
+    { kStatus_FLASHIAP_AddressError, "kStatus_FLASHIAP_AddressError" },
+    { kStatus_FLASHIAP_EraseKeyError, "kStatus_FLASHIAP_EraseKeyError" },
+    { kStatus_FLASHIAP_MemoryNotblank, "kStatus_FLASHIAP_MemoryNotblank" },
+
+    /*!< Group number for FLASHIAP wrapper status codes */
+    { kStatus_FLASHIAP_Success, "kStatus_FLASHIAP_Success" },
+    { kStatus_FLASHIAP_InvalidCommand, "kStatus_FLASHIAP_InvalidCommand" },
+    { kStatus_FLASHIAP_SrcAddrError, "kStatus_FLASHIAP_SrcAddrError" },
+    { kStatus_FLASHIAP_DstAddrError, "kStatus_FLASHIAP_DstAddrError" },
+    { kStatus_FLASHIAP_SrcAddrNotMapped, "kStatus_FLASHIAP_SrcAddrNotMapped" },
+    { kStatus_FLASHIAP_DstAddrNotMapped, "kStatus_FLASHIAP_DstAddrNotMapped" },
+    { kStatus_FLASHIAP_CountError, "kStatus_FLASHIAP_CountError" },
+    { kStatus_FLASHIAP_InvalidSector, "kStatus_FLASHIAP_InvalidSector" },
+    { kStatus_FLASHIAP_SectorNotblank, "kStatus_FLASHIAP_SectorNotblank" },
+    { kStatus_FLASHIAP_NotPrepared, "kStatus_FLASHIAP_NotPrepared" },
+    { kStatus_FLASHIAP_CompareError, "kStatus_FLASHIAP_CompareError" },
+    { kStatus_FLASHIAP_Busy, "kStatus_FLASHIAP_Busy" },
+    { kStatus_FLASHIAP_ParamError, "kStatus_FLASHIAP_ParamError" },
+    { kStatus_FLASHIAP_AddrError, "kStatus_FLASHIAP_AddrError" },
+    { kStatus_FLASHIAP_AddrNotMapped, "kStatus_FLASHIAP_AddrNotMapped" },
+    { kStatus_FLASHIAP_NoPower, "kStatus_FLASHIAP_NoPower" },
+    { kStatus_FLASHIAP_NoClock, "kStatus_FLASHIAP_NoClock" },
 
     // Application crc check statuses.
     { 10400, "kStatus_AppCrcCheckPassed" },
@@ -158,6 +229,96 @@ StatusMessageTableEntry blfwk::g_statusCodes[] = {
     { 10605, "kStatus_ReliableUpdateSwapSystemNotReady" },
     { 10606, "kStatus_ReliableUpdateBackupBootloaderNotReady" },
     { 10607, "kStatus_ReliableUpdateSwapIndicatorAddressInvalid" },
+    { 10608, "kStatus_ReliableUpdateSwapSystemNotAvailable" },
+    { 10609, "kStatus_ReliableUpdateSwapTest" },
+
+    // Serial NOR/EEPROM statuses.
+    { 10700, "kStatus_SerialNorEepromAddressInvalid" },
+    { 10701, "kStatus_SerialNorEepromTransferError" },
+    { 10702, "kStatus_SerialNorEepromTypeInvalid" },
+    { 10703, "kStatus_SerialNorEepromSizeInvalid" },
+    { 10704, "kStatus_SerialNorEepromCommandInvalid" },
+
+    // FlexSPI NAND statuses.
+    { 20000, "kStatus_FlexSPINAND_ReadPageFail" },
+    { 20001, "kStatus_FlexSPINAND_ReadCacheFail" },
+    { 20002, "kStatus_FlexSPINAND_EccCheckFail" },
+    { 20003, "kStatus_FlexSPINAND_PageLoadFail" },
+    { 20004, "kStatus_FlexSPINAND_PageExecuteFail" },
+    { 20005, "kStatus_FlexSPINAND_EraseBlockFail" },
+    { 20006, "kStatus_FlexSPINAND_WaitTimeout" },
+    { 20007, "SPI NAND PageSize over the max supported size" },
+    { 20008, "Failed to update Flash config block to SPI NAND" },
+    { 20009, "Failed to update discovered bad block table to SPI NAND" },
+    { 20010, "kStatus_FlexSPINAND_WriteAlignmentError" },
+    { 20011, "kStatus_FlexSPINAND_NotFound" },
+
+    // FlexSPI NOR statuses.
+    { 20100, "kStatus_FLEXSPINOR_ProgramFail" },
+    { 20101, "kStatus_FLEXSPINOR_EraseSectorFail" },
+    { 20102, "kStatus_FLEXSPINOR_EraseAllFail" },
+    { 20103, "kStatus_FLEXSPINOR_WaitTimeout" },
+    { 20104, "FlexSPI NOR PageSize over the max supported size" },
+    { 20105, "kStatus_FlexSPINOR_WriteAlignmentError" },
+    { 20106, "kStatus_FlexSPINOR_CommandFailure" },
+    { 20107, "kStatus_FlexSPINOR_SFDP_NotFound" },
+    { 20108, "kStatus_FLEXSPINOR_Unsupported_SFDP_Version" },
+    { 20109, "kStatus_FLEXSPINOR_Flash_NotFound" },
+    { 20110, "kStatus_FLEXSPINOR_DTRRead_DummyProbeFailed" },
+
+    { 20200, "kStatus_OCOTP_ReadFailure" },
+    { 20201, "kStatus_OCOTP_ProgramFailure" },
+    { 20202, "kStatus_OCOTP_ReloadFailure" },
+    { 20203, "kStatus_OCOTP_WaitTimeout" },
+
+    // SEMC NOR statuses.
+    { 21100, "kStatus_SemcNOR_DeviceTimeout" },
+    { 21101, "kStatus_SemcNOR_InvalidMemoryAddress" },
+    { 21102, "kStatus_SemcNOR_unmatchedCommandSet" },
+    { 21103, "kStatus_SemcNOR_AddressAlignmentError" },
+    { 21104, "kStatus_SemcNOR_InvalidCfiSignature" },
+    { 21105, "kStatus_SemcNOR_CommandErrorNoOpToSuspend" },
+    { 21106, "kStatus_SemcNOR_CommandErrorNoInfoAvailable" },
+    { 21107, "kStatus_SemcNOR_BlockEraseCommandFailure" },
+    { 21108, "kStatus_SemcNOR_BufferProgramCommandFailure" },
+    { 21109, "kStatus_SemcNOR_ProgramVerifyFailure" },
+    { 21110, "kStatus_SemcNOR_EraseVerifyFailure" },
+    { 21116, "kStatus_SemcNOR_InvalidCfgTag" },
+
+    // SEMC NAND statuses.
+    { 21200, "kStatus_SemcNAND_DeviceTimeout" },
+    { 21201, "kStatus_SemcNAND_InvalidMemoryAddress" },
+    { 21202, "kStatus_SemcNAND_NotEqualToOnePageSize" },
+    { 21203, "kStatus_SemcNAND_MoreThanOnePageSize" },
+    { 21204, "kStatus_SemcNAND_EccCheckFail" },
+    { 21205, "kStatus_SemcNAND_InvalidOnfiParameter" },
+    { 21206, "kStatus_SemcNAND_CannotEnableDeviceEcc" },
+    { 21207, "kStatus_SemcNAND_SwitchTimingModeFailure" },
+    { 21208, "kStatus_SemcNAND_ProgramVerifyFailure" },
+    { 21209, "kStatus_SemcNAND_EraseVerifyFailure" },
+    { 21210, "kStatus_SemcNAND_InvalidReadbackBuffer" },
+    { 21216, "kStatus_SemcNAND_InvalidCfgTag" },
+    { 21217, "kStatus_SemcNAND_FailToUpdateFcb" },
+    { 21218, "kStatus_SemcNAND_FailToUpdateDbbt" },
+    { 21219, "kStatus_SemcNAND_DisallowOverwriteBcb" },
+    { 21220, "kStatus_SemcNAND_OnlySupportOnfiDevice" },
+    { 21221, "kStatus_SemcNAND_MoreThanMaxImageCopy" },
+    { 21222, "kStatus_SemcNAND_DisorderedImageCopies" },
+
+    // SPIFI NOR statuses.
+    { 22000, "kStatus_SPIFINOR_ProgramFail" },
+    { 22001, "kStatus_SPIFINOR_EraseSectorFail" },
+    { 22002, "kStatus_SPIFINOR_EraseAllFail" },
+    { 22003, "kStatus_SPIFINOR_WaitTimeout" },
+    { 22004, "kStatus_SPIFINOR_NotSupported" },
+    { 22005, "kStatus_SPIFINOR_WriteAlignmentError" },
+    { 22006, "kStatus_SPIFINOR_CommandFailure" },
+    { 22007, "kStatus_SPIFINOR_SFDP_NotFound" },
+
+    // FlexSPI statuses.
+    { 70000, "kStatus_FLEXSPI_SequenceExecutionTimeout" },
+    { 70001, "kStatus_FLEXSPI_InvalidSequence" },
+    { 70002, "kStatus_FLEXSPI_DeviceTimeout" },
 
     // Terminator
     { kStatusMessageTableTerminatorValue, "" }
@@ -196,12 +357,24 @@ Command *Command::create(const string_vector_t *argv)
     {
         cmd = new FlashEraseAllUnsecure(argv);
     }
+    else if (argv->at(0) == kCommand_GenerateKeyBlob.name)
+    {
+        cmd = new GenerateKeyBlob(argv);
+    }
     else if (argv->at(0) == kCommand_ReadMemory.name)
     {
         cmd = new ReadMemory(argv);
     }
     else if (argv->at(0) == kCommand_WriteMemory.name)
     {
+        cmd = new WriteMemory(argv);
+    }
+    else if (argv->at(0) == kCommand_ProgramAESKey.name)
+    {
+        // Don't need customer to input address, fix it.
+        (const_cast<string_vector_t *>(argv))->insert(argv->begin() + 1, "0x0");
+        // Add MemoryID to command, it's always 0x200
+        (const_cast<string_vector_t *>(argv))->insert(argv->begin() + 3, "0x200");
         cmd = new WriteMemory(argv);
     }
     else if (argv->at(0) == kCommand_FillMemory.name)
@@ -211,6 +384,18 @@ Command *Command::create(const string_vector_t *argv)
     else if (argv->at(0) == kCommand_ReceiveSbFile.name)
     {
         cmd = new ReceiveSbFile(argv);
+    }
+    else if (argv->at(0) == kCommand_LoadImage.name)
+    {
+        cmd = new LoadImage(argv);
+    }
+    else if (argv->at(0) == kCommand_FuseProgram.name)
+    {
+        cmd = new FuseProgram(argv);
+    }
+    else if (argv->at(0) == kCommand_FuseRead.name)
+    {
+        cmd = new FuseRead(argv);
     }
     else if (argv->at(0) == kCommand_Execute.name)
     {
@@ -228,21 +413,41 @@ Command *Command::create(const string_vector_t *argv)
     {
         cmd = new FlashProgramOnce(argv);
     }
+    else if (argv->at(0) == kCommand_EfuseProgramOnce.name)
+    {
+        // Add lenght parameter to the argv. efuse read and program are always 4bytes alignment.
+        (const_cast<string_vector_t *>(argv))->insert(argv->begin() + 2, "4");
+        cmd = new FlashProgramOnce(argv);
+    }
     else if (argv->at(0) == kCommand_FlashReadOnce.name)
     {
+        cmd = new FlashReadOnce(argv);
+    }
+    else if (argv->at(0) == kCommand_EfuseReadOnce.name)
+    {
+        // Add lenght parameter to the argv. efuse read and program are always 4bytes alignment.
+        (const_cast<string_vector_t *>(argv))->insert(argv->begin() + 2, "4");
         cmd = new FlashReadOnce(argv);
     }
     else if (argv->at(0) == kCommand_FlashReadResource.name)
     {
         cmd = new FlashReadResource(argv);
     }
-    else if (argv->at(0) == kCommand_ConfigureQuadSpi.name)
+    else if (argv->at(0) == kCommand_ConfigureMemory.name)
     {
-        cmd = new ConfigureQuadSpi(argv);
+        cmd = new ConfigureMemory(argv);
     }
     else if (argv->at(0) == kCommand_ReliableUpdate.name)
     {
         cmd = new ReliableUpdate(argv);
+    }
+    else if (argv->at(0) == kCommand_KeyProvisioning.name)
+    {
+        cmd = new KeyProvisioning(argv);
+    }
+    else if (argv->at(0) == kCommand_TrustProvisioning.name)
+    {
+        cmd = new TrustProvisioning(argv);
     }
     else if (argv->at(0) == kCommand_FlashImage.name)
     {
@@ -259,6 +464,10 @@ Command *Command::create(const string_vector_t *argv)
     else if (argv->at(0) == kCommand_ConfigureCan.name)
     {
         cmd = new ConfigureCan(argv);
+    }
+    else if (argv->at(0) == kCommand_ListMemory.name)
+    {
+        cmd = new ListMemory(argv);
     }
     else
     {
@@ -363,6 +572,7 @@ bool Command::processResponse(const generic_response_packet_t *packet, uint8_t c
     }
 
     Log::info("Successful generic response to command '%s'\n", getName().c_str());
+
     return true;
 }
 
@@ -484,12 +694,35 @@ void blfwk::DataPacket::StdOutDataConsumer::processData(const uint8_t *data, uin
     // So moving the cursor to the start will not over-write the data already displayed.
     printf("\r");
 
+    if (m_dataCacheCount)
+    {
+        for (int i = 0; i < m_dataCacheCount; ++i)
+        {
+            printf("%02x", m_dataCache[i]);
+            if ((m_currentCount++ % kBytesPerLine) == 0)
+            {
+                printf("\n");
+            }
+            else
+            {
+                printf(" ");
+            }
+        }
+        m_dataCacheCount = 0;
+    }
+
     for (int i = 0; i < (int)size; ++i)
     {
         printf("%02x", data[i]);
         if ((m_currentCount++ % kBytesPerLine) == 0)
         {
             printf("\n");
+            if ((size - i - 1) < kBytesPerLine)
+            {
+                memcpy(m_dataCache, &data[i + 1], size - i - 1);
+                m_dataCacheCount = size - i - 1;
+                return;
+            }
         }
         else
         {
@@ -501,6 +734,12 @@ void blfwk::DataPacket::StdOutDataConsumer::processData(const uint8_t *data, uin
 //! See host_command.h for documentation on this function.
 uint8_t *blfwk::DataPacket::sendTo(Packetizer &device, uint32_t *bytesWritten, Progress *progress)
 {
+    return sendTo(device, bytesWritten, progress, true);
+}
+
+//! See host_command.h for documentation on this function.
+uint8_t *blfwk::DataPacket::sendTo(Packetizer &device, uint32_t *bytesWritten, Progress *progress, bool hasResponse)
+{
     *bytesWritten = 0;
 
     if (!m_dataProducer->hasMoreData())
@@ -510,7 +749,8 @@ uint8_t *blfwk::DataPacket::sendTo(Packetizer &device, uint32_t *bytesWritten, P
 
     while (m_dataProducer->hasMoreData() && *bytesWritten < m_dataProducer->getDataSize())
     {
-        uint32_t count = m_dataProducer->getData(m_packet, sizeof(m_packet));
+        uint32_t count = MIN(m_packetSize, (m_dataProducer->getDataSize() - *bytesWritten));
+        count = m_dataProducer->getData(m_packet, count);
         if (count)
         {
             status_t status = device.writePacket((const uint8_t *)m_packet, count, kPacketType_Data);
@@ -546,14 +786,24 @@ uint8_t *blfwk::DataPacket::sendTo(Packetizer &device, uint32_t *bytesWritten, P
         }
     }
 
-    // Read final command status
-    uint8_t *responsePacket;
-    uint32_t responseLength;
-    if (device.readPacket(&responsePacket, &responseLength, kPacketType_Command) != kStatus_Success)
+    if (hasResponse)
+    {
+        // Read final command status
+        uint8_t *responsePacket;
+        uint32_t responseLength;
+        if (device.readPacket(&responsePacket, &responseLength, kPacketType_Command) != kStatus_Success)
+        {
+            return NULL;
+        }
+        else
+        {
+            return responsePacket;
+        }
+    }
+    else
     {
         return NULL;
     }
-    return responsePacket;
 }
 
 //! See host_command.h for documentation on this function.
@@ -724,14 +974,14 @@ bool GetProperty::init()
 
     if (getArgCount() == 3)
     {
-        if (!utils::stringtoui(getArg(2), m_memoryId))
+        if (!utils::stringtoui(getArg(2), m_memoryIdorIndex))
         {
             return false;
         }
     }
     else
     {
-        m_memoryId = 0;
+        m_memoryIdorIndex = kMemoryInternal;
     }
 
     return true;
@@ -754,7 +1004,7 @@ void GetProperty::sendTo(Packetizer &device)
     else
     {
         // Command Phase
-        blfwk::CommandPacket cmdPacket(kCommandTag_GetProperty, kCommandFlag_None, m_property.value, m_memoryId);
+        blfwk::CommandPacket cmdPacket(kCommandTag_GetProperty, kCommandFlag_None, m_property.value, m_memoryIdorIndex);
         const uint8_t *responsePacket = cmdPacket.sendCommandGetResponse(device);
 
         const get_property_response_packet_t *packet =
@@ -870,9 +1120,25 @@ bool GetProperty::processResponse(const get_property_response_packet_t *packet)
             }
             break;
         }
-        case kPropertyTag_CrcCheckStatus:
-            m_responseDetails =
-                format_string("CRC Check Status = %s", getStatusMessage(m_responseValues.at(1)).c_str());
+        case kPropertyTag_CheckStatus:
+            if (m_memoryIdorIndex == kCheckStatusId_CrcStatus)
+            {
+                m_responseDetails =
+                    format_string("CRC Check Status = %s", getStatusMessage(m_responseValues.at(1)).c_str());
+            }
+            else if (m_memoryIdorIndex == kCheckSattusId_LastError)
+            {
+                m_responseDetails = "Last Error Content =";
+                for (uint32_t i = 1; i < m_responseValues.size(); ++i)
+                {
+                    m_responseDetails.append(format_string(" 0x%08X", m_responseValues.at(i)));
+                }
+            }
+            else
+            {
+                m_responseDetails = "Unknown Check Status";
+            }
+
             break;
         case kPropertyTag_VerifyWrites:
             m_responseDetails = format_string("Verify Writes Flag = %s", m_responseValues.at(1) ? "ON" : "OFF");
@@ -883,17 +1149,25 @@ bool GetProperty::processResponse(const get_property_response_packet_t *packet)
             break;
         case kPropertyTag_ReservedRegions:
         {
-            uint32_t flashLength = m_responseValues.at(2) - m_responseValues.at(1) + 1;
-            if (flashLength == 1)
-                flashLength = 0;
-            uint32_t ramLength = m_responseValues.at(4) - m_responseValues.at(3) + 1;
-            if (ramLength == 1)
-                ramLength = 0;
+            uint32_t m_reservedRegionCount = packet->commandPacket.parameterCount / 2;
+            uint32_t m_validRegionIndex = 0;
             m_responseDetails = "Reserved Regions = ";
-            m_responseDetails.append(format_string("Flash: 0x%X-0x%X (%s), ", m_responseValues.at(1),
-                                                   m_responseValues.at(2), utils::scale_bytes(flashLength).c_str()));
-            m_responseDetails.append(format_string("RAM: 0x%X-0x%X (%s)", m_responseValues.at(3),
-                                                   m_responseValues.at(4), utils::scale_bytes(ramLength).c_str()));
+            for (uint32_t i = 0; i < m_reservedRegionCount; i++)
+            {
+                uint32_t m_regionStart = m_responseValues.at(1 + 2 * i);
+                uint32_t m_regionEnd = m_responseValues.at(2 + 2 * i);
+                uint32_t m_regionLength = m_regionEnd - m_regionStart + 1;
+
+                if (m_regionLength > 1)
+                {
+                    m_responseDetails.append(format_string("\n        Region%d: 0x%X-0x%X (%s) ", m_validRegionIndex,
+                                                           m_regionStart, m_regionEnd,
+                                                           utils::scale_bytes(m_regionLength).c_str()));
+                    ++m_validRegionIndex;
+                }
+            }
+            m_responseDetails.append("\n");
+
             break;
         }
         case kPropertyTag_RAMStartAddress:
@@ -905,16 +1179,39 @@ bool GetProperty::processResponse(const get_property_response_packet_t *packet)
         case kPropertyTag_SystemDeviceId:
             m_responseDetails = format_string("System Device ID = 0x%08X", m_responseValues.at(1));
             break;
-        case kPropertyTag_FlashSecurityState:
-            m_responseDetails =
-                format_string("Flash Security State = %s", m_responseValues.at(1) ? "SECURE" : "UNSECURE");
-            break;
+        case kPropertyTag_SecurityState:
+        {
+            uint32_t securityState = m_responseValues.at(1);
+            const char *securityStateStr = "";
+            switch (securityState)
+            {
+                case kSecurityState_Legacy_Unsecure:
+                    securityStateStr = "UNSECURE";
+                    break;
+                case kSecurityState_Legacy_Secure:
+                    securityStateStr = "SECURE";
+                    break;
+                case kSecurityState_SKBOOT_Secure:
+                    securityStateStr = "SECURE";
+                    break;
+                case kSecurityState_SKBOOT_Unsecure:
+                    securityStateStr = "UNSECURE";
+                    break;
+                default:
+                    securityStateStr = "UNKNOWN";
+                    break;
+            }
+            m_responseDetails = format_string("Security State = %s", securityStateStr);
+        }
+        break;
         case kPropertyTag_UniqueDeviceId:
             m_responseDetails = "Unique Device ID =";
             for (uint32_t i = 1; i < m_responseValues.size(); ++i)
             {
-                m_responseDetails.append(format_string(" %04X %04X", (m_responseValues.at(i) & 0xffff0000) >> 16,
-                                                       m_responseValues.at(i) & 0x0000ffff));
+                m_responseDetails.append(format_string(
+                    " %02X %02X %02X %02X", (m_responseValues.at(i) & 0x000000ff) >> 0,
+                    (m_responseValues.at(i) & 0x0000ff00) >> 8, (m_responseValues.at(i) & 0x00ff0000) >> 16,
+                    (m_responseValues.at(i) & 0xff000000) >> 24));
             }
             break;
         case kPropertyTag_FacSupport:
@@ -956,15 +1253,13 @@ bool GetProperty::processResponse(const get_property_response_packet_t *packet)
             {
                 string externMemoryDescriptor = "UNKNOWN";
 
-                switch (m_memoryId)
+                for (MemoryArray::const_iterator it = kMemories.begin(); it != kMemories.end(); ++it)
                 {
-                    case 1:
-                        externMemoryDescriptor = "QuadSPI";
-                        break;
-                    default:
-                        break;
+                    if (m_memoryIdorIndex == it->memoryId)
+                    {
+                        externMemoryDescriptor = it->description;
+                    }
                 }
-
                 m_responseDetails = format_string("%s Attributes: ", externMemoryDescriptor.c_str());
             }
 
@@ -1001,7 +1296,48 @@ bool GetProperty::processResponse(const get_property_response_packet_t *packet)
             m_responseDetails =
                 format_string("Reliable Update Status = %s", getStatusMessage(m_responseValues.at(1)).c_str());
             break;
-        case kPropertyTag_Reserved9:
+        case kPropertyTag_FlashPageSize:
+            m_responseDetails =
+                format_string("Flash Page Size = %s", utils::scale_bytes(m_responseValues.at(1)).c_str());
+            break;
+        case kPropertyTag_IrqNotifierPin:
+        {
+            irq_notifier_pin_property_store_t newProperty;
+            newProperty.U = m_responseValues.at(1);
+            if (newProperty.B.enable)
+            {
+                m_responseDetails = format_string("Irq pin is enabled, using GPIO port[%d], pin[%d]",
+                                                  newProperty.B.port, newProperty.B.pin);
+            }
+            else
+            {
+                m_responseDetails = format_string("Irq pin is disabled");
+            }
+        }
+        break;
+        case kPropertyTag_FfrKeystoreUpdateOpt:
+        {
+            string optString;
+            if (m_responseValues.at(1) == kFfrKeystoreUpdateOpt_KeyProvisioning)
+            {
+                optString = format_string("KeyProvisioning");
+            }
+            else if (m_responseValues.at(1) == kFfrKeystoreUpdateOpt_WriteMemory)
+            {
+                optString = format_string("WriteMemory");
+            }
+            else
+            {
+                optString = format_string("UnKnow Option");
+            }
+            m_responseDetails = format_string("FFR KeyStore Update is ") + optString;
+        }
+        break;
+        case kPropertyTag_ByteWriteTimeoutMs:
+        {
+            m_responseDetails = format_string("Byte Write Timeout is %dms", m_responseValues.at(1));
+        }
+        break;
         case kPropertyTag_InvalidProperty:
         default:
             break;
@@ -1047,7 +1383,7 @@ void SetProperty::sendTo(Packetizer &device)
 // See host_command.h for documentation of this method.
 bool FlashEraseRegion::init()
 {
-    if (getArgCount() != 3)
+    if ((getArgCount() != 3) && (getArgCount() != 4))
     {
         return false;
     }
@@ -1061,13 +1397,37 @@ bool FlashEraseRegion::init()
         return false;
     }
 
+    if (getArgCount() == 4)
+    {
+        if (!utils::stringtoui(getArg(3), m_memoryId))
+        {
+            return false;
+        }
+        // Use 0 for erasing internal 4G memory including mapped memory, such as QSPI
+        if (GROUPID(m_memoryId) == kGroup_Internal)
+        {
+            if (m_memoryId != kMemoryInternal)
+            {
+                Log::warning(
+                    "Note: memoryId is not required for flash-erase-region when accessing mapped external memory. "
+                    "Ignore this parameter.\n");
+                m_memoryId = kMemoryInternal;
+            }
+        }
+    }
+    else
+    {
+        m_memoryId = kMemoryInternal;
+    }
+
     return true;
 }
 
 // See host_command.h for documentation of this method.
 void FlashEraseRegion::sendTo(Packetizer &device)
 {
-    blfwk::CommandPacket cmdPacket(kCommandTag_FlashEraseRegion, kCommandFlag_None, m_startAddress, m_byteCount);
+    blfwk::CommandPacket cmdPacket(kCommandTag_FlashEraseRegion, kCommandFlag_None, m_startAddress, m_byteCount,
+                                   m_memoryId);
     processResponse(cmdPacket.sendCommandGetResponse(device));
 }
 
@@ -1078,9 +1438,14 @@ void FlashEraseRegion::sendTo(Packetizer &device)
 // See host_command.h for documentation of this method.
 bool FlashEraseAll::init()
 {
+    if ((getArgCount() != 1) && (getArgCount() != 2))
+    {
+        return false;
+    }
+
     if (getArgCount() == 1)
     {
-        m_memoryId = kFlashMemInternal;
+        m_memoryId = kMemoryInternal;
         return true;
     }
     else if (getArgCount() == 2)
@@ -1130,7 +1495,7 @@ void FlashEraseAllUnsecure::sendTo(Packetizer &device)
 // See host_command.h for documentation of this method.
 bool ReadMemory::init()
 {
-    if ((getArgCount() < 3) || (getArgCount() > 4))
+    if ((getArgCount() < 3) || (getArgCount() > 5))
     {
         return false;
     }
@@ -1147,7 +1512,45 @@ bool ReadMemory::init()
     // File name argument is optional - will use stdout if missing.
     if (getArgCount() == 4)
     {
+        // If the argument 3 is a number, then it is m_memoryId.
+        // Otherwise, it is a file name.
+        // File name "123" is not acceptable, while "123.bin" is OK.
+        if (!utils::stringtoui(getArg(3), m_memoryId))
+        {
+            m_memoryId = kMemoryInternal;
+            m_dataFile = getArg(3);
+        }
+        // Use 0 for reading internal 4G memory including mapped memory, such as QSPI
+        else if (GROUPID(m_memoryId) == kGroup_Internal)
+        {
+            if (m_memoryId != kMemoryInternal)
+            {
+                Log::warning(
+                    "Note: memoryId is not required for read-memory when accessing mapped external memory. Ignore this "
+                    "parameter.\n");
+                m_memoryId = kMemoryInternal;
+            }
+        }
+    }
+
+    if (getArgCount() == 5)
+    {
         m_dataFile = getArg(3);
+        if (!utils::stringtoui(getArg(4), m_memoryId))
+        {
+            return false; // invalid 'memory ID' parameter
+        }
+        // Use 0 for reading internal 4G memory including mapped memory, such as QSPI
+        if (GROUPID(m_memoryId) == kGroup_Internal)
+        {
+            if (m_memoryId != kMemoryInternal)
+            {
+                Log::warning(
+                    "Note: memoryId is not required for read-memory when accessing mapped external memory. Ignore this "
+                    "parameter.\n");
+                m_memoryId = kMemoryInternal;
+            }
+        }
     }
 
     return true;
@@ -1175,7 +1578,7 @@ void ReadMemory::sendTo(Packetizer &device)
     }
 
     // Send command packet.
-    blfwk::CommandPacket cmdPacket(kCommandTag_ReadMemory, kCommandFlag_None, m_startAddress, m_byteCount);
+    blfwk::CommandPacket cmdPacket(kCommandTag_ReadMemory, kCommandFlag_None, m_startAddress, m_byteCount, m_memoryId);
     const uint8_t *responsePacket = cmdPacket.sendCommandGetResponse(device);
 
     const read_memory_response_packet_t *packet =
@@ -1250,6 +1653,19 @@ bool WriteMemory::init()
     }
     m_fileOrData = getArg(2);
 
+    // Try to find the separator ','.
+    size_t separatorIndex = m_fileOrData.find(',', 0);
+    if (separatorIndex != string::npos)
+    {
+        // If found, the left string is the byte count to write.
+        if (!utils::stringtoui(m_fileOrData.substr(separatorIndex + 1, m_fileOrData.length() - separatorIndex - 1),
+                               m_count))
+        {
+            return false;
+        }
+        m_fileOrData = m_fileOrData.substr(0, separatorIndex);
+    }
+
     if ((m_fileOrData[0] == '{') && (m_fileOrData[1] == '{'))
     {
         DataPacket::HexDataProducer hexProducer;
@@ -1262,10 +1678,25 @@ bool WriteMemory::init()
 
     if (getArgCount() == 4)
     {
-        if (!utils::stringtoui(getArg(3), m_count))
+        if (!utils::stringtoui(getArg(3), m_memoryId))
         {
             return false;
         }
+        // Use 0 for writinging internal 4G memory including mapped memory, such as QSPI
+        if (GROUPID(m_memoryId) == kGroup_Internal)
+        {
+            if (m_memoryId != kMemoryInternal)
+            {
+                Log::warning(
+                    "Note: memoryId is not required for write-memory when accessing mapped external memory. Ignore "
+                    "this parameter.\n");
+                m_memoryId = kMemoryInternal;
+            }
+        }
+    }
+    else
+    {
+        m_memoryId = kMemoryInternal;
     }
 
     return true;
@@ -1306,10 +1737,33 @@ void WriteMemory::sendTo(Packetizer &device)
         dataProducer = &fileProducer;
     }
 
+    // Get target bootloader data packet size.
+    uint32_t packetSizeInBytes;
+    GetProperty getPacketSize(kProperty_MaxPacketSize, 0 /*Not used*/);
+    getPacketSize.sendTo(device);
+    uint32_t fw_status = getPacketSize.getResponseValues()->at(0);
+    if (fw_status != kStatus_Success)
+    {
+        // Failed to get data packet size.
+        Log::warning("Warning: Failed to get packet size. Using default size(%d)", kMinPacketBufferSize);
+        packetSizeInBytes = kMinPacketBufferSize; // No property. Use default packet size.
+    }
+    else
+    {
+        packetSizeInBytes = getPacketSize.getResponseValues()->at(1);
+        if (packetSizeInBytes > device.getMaxPacketSize())
+        {
+            Log::error("Error: Packet size(%d) is bigger than max supported size(%d).", packetSizeInBytes,
+                       kMaxHostPacketSize);
+            return;
+        }
+    }
+
     // Send command packet.
     uint32_t bytesToWrite = dataProducer->getDataSize();
     uint32_t bytesWritten;
-    blfwk::CommandPacket cmdPacket(kCommandTag_WriteMemory, kCommandFlag_HasDataPhase, m_startAddress, bytesToWrite);
+    blfwk::CommandPacket cmdPacket(kCommandTag_WriteMemory, kCommandFlag_HasDataPhase, m_startAddress, bytesToWrite,
+                                   m_memoryId);
     if (!processResponse(cmdPacket.sendCommandGetResponse(device)))
     {
         m_responseDetails = format_string("Wrote 0 of %d bytes.", bytesToWrite);
@@ -1323,11 +1777,193 @@ void WriteMemory::sendTo(Packetizer &device)
     }
 
     // Send data packets.
-    blfwk::DataPacket dataPacket(dataProducer);
+    blfwk::DataPacket dataPacket(dataProducer, packetSizeInBytes);
+
     processResponse(dataPacket.sendTo(device, &bytesWritten, m_progress));
 
     // Format the command transfer details.
     m_responseDetails = format_string("Wrote %d of %d bytes.", bytesWritten, bytesToWrite);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// GenerateKeyBlob command
+////////////////////////////////////////////////////////////////////////////////
+
+// See host_command.h for documentation of this method.
+bool GenerateKeyBlob::init()
+{
+    if ((getArgCount() != 3) && (getArgCount() != 4))
+    {
+        return false;
+    }
+
+    m_fileDek = getArg(1);
+
+    m_fileKeyBlob = getArg(2);
+
+    if (getArgCount() == 4)
+    {
+        if (!utils::stringtoui(getArg(3), m_keySel))
+        {
+            string keyStr = getArg(3);
+            if (keyStr == "OTPMK")
+            {
+                m_keySel = GenerateKeyBlob::kKeySource_SNVS_OTPMK;
+            }
+            else if (keyStr == "ZMK")
+            {
+                m_keySel = GenerateKeyBlob::kKeySource_SNVS_ZMK;
+            }
+            else if (keyStr == "CMK")
+            {
+                m_keySel = GenerateKeyBlob::kKeySource_SNVS_CMK;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+// See host_command.h for documentation of this method.
+void GenerateKeyBlob::sendTo(Packetizer &device)
+{
+    DataPacket::FileDataProducer fileProducer;
+    DataPacket::DataProducer *dataProducer;
+
+    // Argument string is file name, so use file data producer.
+    if (!fileProducer.init(m_fileDek, m_count))
+    {
+        return;
+    }
+    dataProducer = &fileProducer;
+
+    m_dataPhase = 0;
+    // Send command packet.
+    uint32_t bytesToWrite = dataProducer->getDataSize();
+    uint32_t bytesWritten;
+    blfwk::CommandPacket cmdPacket(kCommandTag_GenerateKeyBlob, kCommandFlag_HasDataPhase, m_keySel, bytesToWrite,
+                                   m_dataPhase);
+    const uint8_t *responsePacket = cmdPacket.sendCommandGetResponse(device);
+    const generate_key_blob_response_packet_t *packet =
+        reinterpret_cast<const generate_key_blob_response_packet_t *>(responsePacket);
+    if (!processResponse(packet))
+    {
+        m_responseDetails = format_string("Send 0 of %d bytes.", bytesToWrite);
+        return;
+    }
+
+    // Pop the 1st response value.(command phase in the 1st blob phase)
+    if (m_responseValues.size())
+    {
+        m_responseValues.pop_back();
+    }
+
+    // Send data packets.
+    blfwk::DataPacket dataPacket(dataProducer);
+    if (!processResponse(dataPacket.sendTo(device, &bytesWritten, m_progress)))
+    {
+        m_responseDetails = format_string("Send %d of %d bytes.", bytesWritten, bytesToWrite);
+        return;
+    }
+    else
+    {
+        Log::info("Send %d of %d bytes.\n", bytesWritten, bytesToWrite);
+    }
+
+    // Pop the 2nd response value.(data phase in the 1st blob phase)
+    if (m_responseValues.size())
+    {
+        m_responseValues.pop_back();
+    }
+
+    DataPacket::DataConsumer *dataConsumer;
+    DataPacket::FileDataConsumer fileDataConsumer;
+    DataPacket::StdOutDataConsumer stdoutDataConsumer;
+
+    // Setup to write to file or stdout
+    if (m_fileKeyBlob.size() > 0)
+    {
+        if (!fileDataConsumer.init(m_fileKeyBlob))
+        {
+            return;
+        }
+        dataConsumer = &fileDataConsumer;
+    }
+    else
+    {
+        dataConsumer = &stdoutDataConsumer;
+    }
+
+    m_count = 72; // Default is AES128bit`
+    m_dataPhase = 1;
+    // Send command packet.
+    blfwk::CommandPacket cmdPacket1(kCommandTag_GenerateKeyBlob, kCommandFlag_None, m_keySel, m_count, m_dataPhase);
+    const uint8_t *responsePacket1 = cmdPacket1.sendCommandGetResponse(device);
+
+    const generate_key_blob_response_packet_t *packet1 =
+        reinterpret_cast<const generate_key_blob_response_packet_t *>(responsePacket1);
+    uint32_t byteCount = m_count;
+    if (processResponse(packet1))
+    {
+        // Pop the 3rd response value.(command phase in the 2nd blob phase)
+        if (m_responseValues.size())
+        {
+            m_responseValues.pop_back();
+        }
+
+        m_count = packet1->dataByteCount;
+        byteCount = m_count;
+
+        // Receive data packets.
+        blfwk::DataPacket dataPacket(dataConsumer);
+        uint8_t *finalResponsePacket = dataPacket.receiveFrom(device, &byteCount, m_progress);
+        processResponse(finalResponsePacket);
+    }
+
+    // Push the number of bytes transferred response value.
+    m_responseValues.push_back(m_count - byteCount);
+
+    // Format the command transfer details.
+    m_responseDetails = format_string("Read %d of %d bytes.", m_count - byteCount, m_count);
+}
+
+bool GenerateKeyBlob::processResponse(const generate_key_blob_response_packet_t *packet)
+{
+    if (!packet)
+    {
+        Log::debug("processResponse: null packet\n");
+        m_responseValues.push_back(kStatus_NoResponse);
+        return false;
+    }
+
+    // Handle generic response, which would be returned if command is not supported.
+    if (packet->commandPacket.commandTag == kCommandTag_GenericResponse)
+    {
+        return processResponse((const uint8_t *)packet);
+    }
+
+    if (packet->commandPacket.commandTag != kCommandTag_GenerateKeyBlobResponse)
+    {
+        Log::error("Error: expected kCommandTag_GenerateKeyBlob (0x%x), received 0x%x\n",
+                   kCommandTag_GenerateKeyBlobResponse, packet->commandPacket.commandTag);
+        m_responseValues.push_back(kStatus_UnknownCommand);
+        return false;
+    }
+    if (packet->status != kStatus_Success)
+    {
+        // Set the status in the response vector.
+        // If status is OK, this push will be done by final response processing
+        m_responseValues.push_back(packet->status);
+        return false;
+    }
+
+    Log::info("Successful response to command '%s'\n", getName().c_str());
+
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1411,6 +2047,28 @@ void ReceiveSbFile::sendTo(Packetizer &device)
         return;
     }
 
+    // Get target bootloader data packet size.
+    uint32_t packetSizeInBytes;
+    GetProperty getPacketSize(kProperty_MaxPacketSize, 0 /*Not used*/);
+    getPacketSize.sendTo(device);
+    uint32_t fw_status = getPacketSize.getResponseValues()->at(0);
+    if (fw_status != kStatus_Success)
+    {
+        // Failed to get data packet size.
+        Log::warning("Warning: Failed to get packet size. Using default size(%d)", kMinPacketBufferSize);
+        packetSizeInBytes = kMinPacketBufferSize; // No property. Use default packet size.
+    }
+    else
+    {
+        packetSizeInBytes = getPacketSize.getResponseValues()->at(1);
+        if (packetSizeInBytes > device.getMaxPacketSize())
+        {
+            Log::error("Error: Packet size(%d) is bigger than max supported size(%d).", packetSizeInBytes,
+                       kMaxHostPacketSize);
+            return;
+        }
+    }
+
     // Send command packet.
     uint32_t bytesToWrite = dataProducer.getDataSize();
     uint32_t bytesWritten;
@@ -1428,13 +2086,404 @@ void ReceiveSbFile::sendTo(Packetizer &device)
     }
 
     // Send data packets.
+#if !(defined(BL_FEATURE_RECEIVE_SB_FILE_CMD_PERF_IMP) && (BL_FEATURE_RECEIVE_SB_FILE_CMD_PERF_IMP == 1))
+    /*
+     * If the SB file used for the target doesn't contain any JUMP(EXECUTE), CALL or RESET command.
+     * The macro BL_FEATURE_RECEIVE_SB_FILE_CMD_PERF_IMP can be set to improve the transformation performance.
+     */
     device.setAbortEnabled(true);
-    blfwk::DataPacket dataPacket(&dataProducer);
+#endif
+    blfwk::DataPacket dataPacket(&dataProducer, packetSizeInBytes);
     processResponse(dataPacket.sendTo(device, &bytesWritten, m_progress));
+#if !(defined(BL_FEATURE_RECEIVE_SB_FILE_CMD_PERF_IMP) && (BL_FEATURE_RECEIVE_SB_FILE_CMD_PERF_IMP == 1))
     device.setAbortEnabled(false);
+#endif
 
     // Format the command transfer details.
     m_responseDetails = format_string("Wrote %d of %d bytes.", bytesWritten, bytesToWrite);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// FuseProgram command
+////////////////////////////////////////////////////////////////////////////////
+
+// See host_command.h for documentation of this method.
+bool FuseProgram::init()
+{
+    if (getArgCount() != 3 && getArgCount() != 4)
+    {
+        return false;
+    }
+
+    if (!utils::stringtoui(getArg(1), m_startAddress))
+    {
+        return false;
+    }
+    m_fileOrData = getArg(2);
+
+    // Try to find the separator ','.
+    size_t separatorIndex = m_fileOrData.find(',', 0);
+    if (separatorIndex != string::npos)
+    {
+        // If found, the left string is the byte count to write.
+        if (!utils::stringtoui(m_fileOrData.substr(separatorIndex + 1, m_fileOrData.length() - separatorIndex - 1),
+                               m_count))
+        {
+            return false;
+        }
+        m_fileOrData = m_fileOrData.substr(0, separatorIndex);
+    }
+
+    if ((m_fileOrData[0] == '{') && (m_fileOrData[1] == '{'))
+    {
+        DataPacket::HexDataProducer hexProducer;
+        // Argument string is hex data, so use hex data producer.
+        if (hexProducer.initFromString(m_fileOrData) == 0)
+        {
+            return false;
+        }
+    }
+
+    if (getArgCount() == 4)
+    {
+        if (!utils::stringtoui(getArg(3), m_memoryId))
+        {
+            return false;
+        }
+        // Use 0 for writinging internal 4G memory including mapped memory, such as QSPI
+        if (GROUPID(m_memoryId) == kGroup_Internal)
+        {
+            if (m_memoryId != kMemoryInternal)
+            {
+                Log::warning(
+                    "Note: memoryId is not required for write-memory when accessing mapped external memory. Ignore "
+                    "this parameter.\n");
+                m_memoryId = kMemoryInternal;
+            }
+        }
+    }
+    else
+    {
+        m_memoryId = kMemoryInternal;
+    }
+
+    return true;
+}
+
+// See host_command.h for documentation of this method.
+void FuseProgram::sendTo(Packetizer &device)
+{
+    DataPacket::HexDataProducer hexProducer(m_data);
+    DataPacket::FileDataProducer fileProducer;
+    DataPacket::SegmentDataProducer segmentProducer(m_segment);
+    DataPacket::DataProducer *dataProducer;
+
+    if (m_segment)
+    {
+        dataProducer = &segmentProducer;
+    }
+    else if ((m_fileOrData[0] == '{') && (m_fileOrData[1] == '{'))
+    {
+        // Argument string is hex data, so use hex data producer.
+        if (hexProducer.initFromString(m_fileOrData) == 0)
+        {
+            return;
+        }
+        dataProducer = &hexProducer;
+    }
+    else if (m_data.size() > 0)
+    {
+        dataProducer = &hexProducer;
+    }
+    else
+    {
+        // Argument string is file name, so use file data producer.
+        if (!fileProducer.init(m_fileOrData, m_count))
+        {
+            return;
+        }
+        dataProducer = &fileProducer;
+    }
+
+    // Get target bootloader data packet size.
+    uint32_t packetSizeInBytes;
+    GetProperty getPacketSize(kProperty_MaxPacketSize, 0 /*Not used*/);
+    getPacketSize.sendTo(device);
+    uint32_t fw_status = getPacketSize.getResponseValues()->at(0);
+    if (fw_status != kStatus_Success)
+    {
+        // Failed to get data packet size.
+        Log::warning("Warning: Failed to get packet size. Using default size(%d)", kMinPacketBufferSize);
+        packetSizeInBytes = kMinPacketBufferSize; // No property. Use default packet size.
+    }
+    else
+    {
+        packetSizeInBytes = getPacketSize.getResponseValues()->at(1);
+        if (packetSizeInBytes > device.getMaxPacketSize())
+        {
+            Log::error("Error: Packet size(%d) is bigger than max supported size(%d).", packetSizeInBytes,
+                       kMaxHostPacketSize);
+            return;
+        }
+    }
+
+    // Send command packet.
+    uint32_t bytesToWrite = dataProducer->getDataSize();
+    uint32_t bytesWritten;
+    blfwk::CommandPacket cmdPacket(kCommandTag_FuseProgram, kCommandFlag_HasDataPhase, m_startAddress, bytesToWrite,
+                                   m_memoryId);
+    if (!processResponse(cmdPacket.sendCommandGetResponse(device)))
+    {
+        m_responseDetails = format_string("Wrote 0 of %d bytes.", bytesToWrite);
+        return;
+    }
+
+    // Pop the initial (successful) generic response value.
+    if (m_responseValues.size())
+    {
+        m_responseValues.pop_back();
+    }
+
+    // Send data packets.
+    blfwk::DataPacket dataPacket(dataProducer, packetSizeInBytes);
+
+    processResponse(dataPacket.sendTo(device, &bytesWritten, m_progress));
+
+    // Format the command transfer details.
+    m_responseDetails = format_string("Wrote %d of %d bytes.", bytesWritten, bytesToWrite);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// FuseRead command
+////////////////////////////////////////////////////////////////////////////////
+
+// See host_command.h for documentation of this method.
+bool FuseRead::init()
+{
+    if ((getArgCount() < 3) || (getArgCount() > 5))
+    {
+        return false;
+    }
+
+    if (!utils::stringtoui(getArg(1), m_startAddress))
+    {
+        return false; // invalid 'addr' parameter
+    }
+    if (!utils::stringtoui(getArg(2), m_byteCount))
+    {
+        return false; // invalid 'count' parameter
+    }
+
+    // File name argument is optional - will use stdout if missing.
+    if (getArgCount() == 4)
+    {
+        // If the argument 3 is a number, then it is m_memoryId.
+        // Otherwise, it is a file name.
+        // File name "123" is not acceptable, while "123.bin" is OK.
+        if (!utils::stringtoui(getArg(3), m_memoryId))
+        {
+            m_memoryId = kMemoryInternal;
+            m_dataFile = getArg(3);
+        }
+        // Use 0 for reading internal 4G memory including mapped memory, such as QSPI
+        else if (GROUPID(m_memoryId) == kGroup_Internal)
+        {
+            if (m_memoryId != kMemoryInternal)
+            {
+                Log::warning(
+                    "Note: memoryId is not required for read-memory when accessing mapped external memory. Ignore this "
+                    "parameter.\n");
+                m_memoryId = kMemoryInternal;
+            }
+        }
+    }
+
+    if (getArgCount() == 5)
+    {
+        m_dataFile = getArg(3);
+        if (!utils::stringtoui(getArg(4), m_memoryId))
+        {
+            return false; // invalid 'memory ID' parameter
+        }
+        // Use 0 for reading internal 4G memory including mapped memory, such as QSPI
+        if (GROUPID(m_memoryId) == kGroup_Internal)
+        {
+            if (m_memoryId != kMemoryInternal)
+            {
+                Log::warning(
+                    "Note: memoryId is not required for read-memory when accessing mapped external memory. Ignore this "
+                    "parameter.\n");
+                m_memoryId = kMemoryInternal;
+            }
+        }
+    }
+
+    return true;
+}
+
+// See host_command.h for documentation of this method.
+void FuseRead::sendTo(Packetizer &device)
+{
+    DataPacket::DataConsumer *dataConsumer;
+    DataPacket::FileDataConsumer fileDataConsumer;
+    DataPacket::StdOutDataConsumer stdoutDataConsumer;
+
+    // Setup to write to file or stdout
+    if (m_dataFile.size() > 0)
+    {
+        if (!fileDataConsumer.init(m_dataFile))
+        {
+            return;
+        }
+        dataConsumer = &fileDataConsumer;
+    }
+    else
+    {
+        dataConsumer = &stdoutDataConsumer;
+    }
+
+    // Send command packet.
+    blfwk::CommandPacket cmdPacket(kCommandTag_FuseRead, kCommandFlag_None, m_startAddress, m_byteCount, m_memoryId);
+    const uint8_t *responsePacket = cmdPacket.sendCommandGetResponse(device);
+
+    const read_memory_response_packet_t *packet =
+        reinterpret_cast<const read_memory_response_packet_t *>(responsePacket);
+    uint32_t byteCount = m_byteCount;
+    if (processResponse(packet))
+    {
+        byteCount = packet->dataByteCount;
+
+        // Receive data packets.
+        blfwk::DataPacket dataPacket(dataConsumer);
+        uint8_t *finalResponsePacket = dataPacket.receiveFrom(device, &byteCount, m_progress);
+        processResponse(finalResponsePacket);
+    }
+
+    // Push the number of bytes transferred response value.
+    m_responseValues.push_back(m_byteCount - byteCount);
+
+    // Format the command transfer details.
+    m_responseDetails = format_string("Read %d of %d bytes.", m_byteCount - byteCount, m_byteCount);
+}
+
+bool FuseRead::processResponse(const read_memory_response_packet_t *packet)
+{
+    if (!packet)
+    {
+        Log::debug("processResponse: null packet\n");
+        m_responseValues.push_back(kStatus_NoResponse);
+        return false;
+    }
+
+    // Handle generic response, which would be returned if command is not supported.
+    if (packet->commandPacket.commandTag == kCommandTag_GenericResponse)
+    {
+        return processResponse((const uint8_t *)packet);
+    }
+
+    if (packet->commandPacket.commandTag != kCommandTag_ReadMemoryResponse)
+    {
+        Log::error("Error: expected kCommandTag_ReadMemoryResponse (0x%x), received 0x%x\n",
+                   kCommandTag_ReadMemoryResponse, packet->commandPacket.commandTag);
+        return false;
+    }
+    if (packet->status != kStatus_Success)
+    {
+        // Set the status in the response vector.
+        // If status is OK, this push will be done by final response processing
+        m_responseValues.push_back(packet->status);
+        return false;
+    }
+
+    Log::info("Successful response to command '%s'\n", getName().c_str());
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// LoadImage command
+////////////////////////////////////////////////////////////////////////////////
+
+// See host_command.h for documentation of this method.
+bool LoadImage::init()
+{
+    if (getArgCount() != 2)
+    {
+        return false;
+    }
+    m_dataFile = getArg(1);
+    return true;
+}
+
+// See host_command.h for documentation of this method.
+void LoadImage::sendTo(Packetizer &device)
+{
+    DataPacket::FileDataProducer dataProducer;
+    if (!dataProducer.init(m_dataFile, 0))
+    {
+        return;
+    }
+
+    // Get target bootloader data packet size.
+    uint32_t packetSizeInBytes;
+    GetProperty getPacketSize(kProperty_MaxPacketSize, 0 /*Not used*/);
+    getPacketSize.sendTo(device);
+    uint32_t fw_status = getPacketSize.getResponseValues()->at(0);
+    if (fw_status != kStatus_Success)
+    {
+        // Failed to get data packet size.
+        Log::warning("Warning: Failed to get packet size. Using default size(%d)", kMinPacketBufferSize);
+        packetSizeInBytes = kMinPacketBufferSize; // No property. Use default packet size.
+    }
+    else
+    {
+        packetSizeInBytes = getPacketSize.getResponseValues()->at(1);
+        if (packetSizeInBytes > device.getMaxPacketSize())
+        {
+            Log::error("Error: Packet size(%d) is bigger than max supported size(%d).", packetSizeInBytes,
+                       kMaxHostPacketSize);
+            return;
+        }
+    }
+
+    // Send command packet.
+    uint32_t bytesToWrite = dataProducer.getDataSize();
+    uint32_t bytesWritten;
+
+    // Send data packets.
+    blfwk::DataPacket dataPacket(&dataProducer, packetSizeInBytes);
+
+    dataPacket.sendTo(device, &bytesWritten, m_progress, false);
+
+    uint32_t status = kStatus_Fail;
+    // DO NOT call processResponse to handle the result. load-image doesn't transfer any command packet, including
+    // response packet.
+    if (bytesWritten == dataProducer.getDataSize())
+    {
+        status = kStatus_Success;
+    }
+    else
+    {
+        status = kStatus_Fail;
+    }
+    m_responseValues.push_back(status);
+    // Format the command transfer details.
+    m_responseDetails = format_string("Wrote %d of %d bytes.", bytesWritten, bytesToWrite);
+
+    generic_response_packet_t m_genericResponse;
+    m_genericResponse.commandPacket.commandTag = kCommandTag_GenericResponse;
+    m_genericResponse.commandPacket.flags = 0;
+    m_genericResponse.commandPacket.parameterCount = 2;
+    m_genericResponse.commandPacket.reserved = 0;
+    m_genericResponse.commandTag = 0;
+    m_genericResponse.status = status;
+
+    processResponse((uint8_t *)&m_genericResponse);
+}
+
+bool LoadImage::processResponse(const uint8_t *packet)
+{
+    return Command::processResponse((generic_response_packet_t *)packet, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1532,12 +2581,14 @@ bool FlashSecurityDisable::init()
 
     // String must be hex digits with no leading 0x.
     char *endPtr;
-    m_keyLow = strtoul(getArg(1).substr(0, 8).c_str(), &endPtr, 16);
+    std::string s_keyLow = getArg(1).substr(0, 8);
+    m_keyLow = strtoul(s_keyLow.c_str(), &endPtr, 16);
     if ((endPtr == NULL) || (*endPtr != 0))
     {
         return false;
     }
-    m_keyHigh = strtoul(getArg(1).substr(8, 8).c_str(), &endPtr, 16);
+    std::string s_keyHigh = getArg(1).substr(8, 8);
+    m_keyHigh = strtoul(s_keyHigh.c_str(), &endPtr, 16);
     if ((endPtr == NULL) || (*endPtr != 0))
     {
         return false;
@@ -1560,12 +2611,12 @@ void FlashSecurityDisable::sendTo(Packetizer &device)
 // See host_command.h for documentation of this method.
 bool FlashProgramOnce::init()
 {
-    if (getArgCount() != 4)
+    if ((getArgCount() != 4) && (getArgCount() != 5) && (getArgCount() != 6))
     {
         return false;
     }
 
-    if (getArg(3).length() != 8 && getArg(3).length() != 16)
+    if ((getArg(3).length() != 8) && (getArg(3).length() != 16))
     {
         return false;
     }
@@ -1579,13 +2630,14 @@ bool FlashProgramOnce::init()
         return false;
     }
 
-    if (m_byteCount != 4 && m_byteCount != 8)
+    if ((m_byteCount != 4) && (m_byteCount != 8))
     {
         return false;
     }
 
     char *endPtr;
-    m_dataLow = strtoul(getArg(3).substr(0, 8).c_str(), &endPtr, 16);
+    std::string s_dataHigh = getArg(3).substr(0, 8);
+    m_dataHigh = strtoul(s_dataHigh.c_str(), &endPtr, 16);
     if ((endPtr == NULL) || (*endPtr != 0))
     {
         return false;
@@ -1593,29 +2645,73 @@ bool FlashProgramOnce::init()
 
     if (m_byteCount == 8)
     {
-        m_dataHigh = strtoul(getArg(3).substr(8, 8).c_str(), &endPtr, 16);
+        std::string s_dataLow = getArg(3).substr(8, 8);
+        m_dataLow = strtoul(s_dataLow.c_str(), &endPtr, 16);
         if ((endPtr == NULL) || (*endPtr != 0))
         {
             return false;
         }
     }
 
+    if (getArgCount() == 5)
+    {
+        if ((getArg(4) == "LSB") || (getArg(4) == "lsb"))
+        {
+            m_lsb = true;
+        }
+        else if ((getArg(4) == "MSB") || (getArg(4) == "msb"))
+        {
+            m_lsb = false;
+        }
+        else if (strcmp(getArg(4).c_str(), "lock") == 0)
+        {
+            m_index |= (1ul << 24);
+        }
+        else
+        {
+            return false;
+        }
+    }
+    else
+    {
+        m_lsb = true;
+    }
     return true;
 }
 
 // See host_command.h for documentation of this method.
 void FlashProgramOnce::sendTo(Packetizer &device)
 {
+    uint32_t firstWord, secondWord;
+
     if (m_byteCount == 4)
     {
+        if (m_lsb)
+        {
+            firstWord = ENDIAN_HOST_TO_LITTLE_U32(m_dataHigh);
+        }
+        else
+        {
+            firstWord = ENDIAN_HOST_TO_BIG_U32(m_dataHigh);
+        }
         blfwk::CommandPacket cmdPacket(kCommandTag_FlashProgramOnce, kCommandFlag_None, m_index, m_byteCount,
-                                       m_dataLow);
+                                       firstWord);
         processResponse(cmdPacket.sendCommandGetResponse(device));
     }
     else
     {
-        blfwk::CommandPacket cmdPacket(kCommandTag_FlashProgramOnce, kCommandFlag_None, m_index, m_byteCount, m_dataLow,
-                                       m_dataHigh);
+        if (m_lsb)
+        {
+            firstWord = ENDIAN_HOST_TO_LITTLE_U32(m_dataLow);
+            secondWord = ENDIAN_HOST_TO_LITTLE_U32(m_dataHigh);
+        }
+        else
+        {
+            firstWord = ENDIAN_HOST_TO_BIG_U32(m_dataHigh);
+            secondWord = ENDIAN_HOST_TO_BIG_U32(m_dataLow);
+        }
+        blfwk::CommandPacket cmdPacket(kCommandTag_FlashProgramOnce, kCommandFlag_None, m_index, m_byteCount, firstWord,
+                                       secondWord);
         processResponse(cmdPacket.sendCommandGetResponse(device));
     }
 }
@@ -1824,17 +2920,17 @@ bool FlashReadResource::processResponse(const flash_read_resource_response_packe
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Configure QuadSpi command
+// Configure Memory command
 ////////////////////////////////////////////////////////////////////////////////
 
 // See host_command.h for documentation of this method.
-bool ConfigureQuadSpi::init()
+bool ConfigureMemory::init()
 {
     if (getArgCount() != 3)
     {
         return false;
     }
-    if (!utils::stringtoui(getArg(1), m_flashMemId))
+    if (!utils::stringtoui(getArg(1), m_memoryId))
     {
         return false;
     }
@@ -1846,14 +2942,10 @@ bool ConfigureQuadSpi::init()
     return true;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Configure Peripheral command
-////////////////////////////////////////////////////////////////////////////////
-
 // See host_command.h for documentation of this method.
-void ConfigureQuadSpi::sendTo(Packetizer &device)
+void ConfigureMemory::sendTo(Packetizer &device)
 {
-    blfwk::CommandPacket cmdPacket(kCommandTag_ConfigureQuadSpi, kCommandFlag_None, m_flashMemId, m_configBlockAddress);
+    blfwk::CommandPacket cmdPacket(kCommandTag_ConfigureMemory, kCommandFlag_None, m_memoryId, m_configBlockAddress);
     processResponse(cmdPacket.sendCommandGetResponse(device));
 }
 
@@ -1884,13 +2976,981 @@ void ReliableUpdate::sendTo(Packetizer &device)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Key Provisioning command
+////////////////////////////////////////////////////////////////////////////////
+
+// See host_command.h for documentation of this method.
+bool KeyProvisioning::init()
+{
+    size_t separatorIndex;
+
+    if (getArgCount() < 2) // 1 arguement at least.
+    {
+        return false;
+    }
+
+    if (!utils::stringtoui(getArg(1), m_operation))
+    {
+        if (strcmp(getArg(1).c_str(), "enroll") == 0)
+        {
+            m_operation = kKeyProvisioning_Operation_Enroll;
+        }
+        else if (strcmp(getArg(1).c_str(), "set_user_key") == 0)
+        {
+            m_operation = kKeyProvisioning_Operation_SetUserKey;
+        }
+        else if (strcmp(getArg(1).c_str(), "set_key") == 0)
+        {
+            m_operation = kKeyProvisioning_Operation_SetIntrinsicKey;
+        }
+        else if (strcmp(getArg(1).c_str(), "write_key_nonvolatile") == 0)
+        {
+            m_operation = kKeyProvisioning_Operation_WriteNonVolatile;
+        }
+        else if (strcmp(getArg(1).c_str(), "read_key_nonvolatile") == 0)
+        {
+            m_operation = kKeyProvisioning_Operation_ReadNonVolatile;
+        }
+        else if (strcmp(getArg(1).c_str(), "write_key_store") == 0)
+        {
+            m_operation = kKeyProvisioning_Operation_WriteKeyStore;
+        }
+        else if (strcmp(getArg(1).c_str(), "read_key_store") == 0)
+        {
+            m_operation = kKeyProvisioning_Operation_ReadKeyStore;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    switch (m_operation)
+    {
+        case kKeyProvisioning_Operation_Enroll:
+            if (getArgCount() != 2)
+            {
+                return false;
+            }
+            break;
+        case kKeyProvisioning_Operation_SetUserKey:
+            if (getArgCount() != 4)
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(2), m_type))
+            {
+                return false;
+            }
+
+            m_fileOrData = getArg(3);
+
+            // Try to find the separator ','.
+            separatorIndex = m_fileOrData.find(',', 0);
+            if (separatorIndex != string::npos)
+            {
+                // If found, the left string is the byte count to write.
+                if (!utils::stringtoui(
+                        m_fileOrData.substr(separatorIndex + 1, m_fileOrData.length() - separatorIndex - 1), m_size))
+                {
+                    return false;
+                }
+                m_fileOrData = m_fileOrData.substr(0, separatorIndex);
+            }
+
+            if ((m_fileOrData[0] == '{') && (m_fileOrData[1] == '{'))
+            {
+                DataPacket::HexDataProducer hexProducer;
+                // Argument string is hex data, so use hex data producer.
+                if (hexProducer.initFromString(m_fileOrData) == 0)
+                {
+                    return false;
+                }
+            }
+            break;
+        case kKeyProvisioning_Operation_SetIntrinsicKey:
+            if (getArgCount() != 4)
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(2), m_type))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(3), m_size))
+            {
+                return false;
+            }
+            break;
+        case kKeyProvisioning_Operation_WriteNonVolatile:
+        case kKeyProvisioning_Operation_ReadNonVolatile:
+            if ((getArgCount() != 2) && (getArgCount() != 3))
+            {
+                return false;
+            }
+
+            if (getArgCount() == 3)
+            {
+                if (!utils::stringtoui(getArg(2), m_memoryId))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                m_memoryId = 0;
+            }
+
+            break;
+        case kKeyProvisioning_Operation_WriteKeyStore:
+            if (getArgCount() != 3)
+            {
+                return false;
+            }
+            m_fileOrData = getArg(2);
+
+            // Try to find the separator ','.
+            separatorIndex = m_fileOrData.find(',', 0);
+            if (separatorIndex != string::npos)
+            {
+                // If found, the left string is the byte count to write.
+                if (!utils::stringtoui(
+                        m_fileOrData.substr(separatorIndex + 1, m_fileOrData.length() - separatorIndex - 1), m_size))
+                {
+                    return false;
+                }
+                m_fileOrData = m_fileOrData.substr(0, separatorIndex);
+            }
+
+            if ((m_fileOrData[0] == '{') && (m_fileOrData[1] == '{'))
+            {
+                DataPacket::HexDataProducer hexProducer;
+                // Argument string is hex data, so use hex data producer.
+                if (hexProducer.initFromString(m_fileOrData) == 0)
+                {
+                    return false;
+                }
+            }
+            break;
+        case kKeyProvisioning_Operation_ReadKeyStore:
+            if ((getArgCount() != 2) && (getArgCount() != 3))
+            {
+                return false;
+            }
+            if (getArgCount() == 3)
+            {
+                m_fileOrData = getArg(2);
+            }
+            break;
+        default:
+            return false;
+    }
+
+    return true;
+}
+
+// See host_command.h for documentation of this method.
+void KeyProvisioning::sendTo(Packetizer &device)
+{
+    switch (m_operation)
+    {
+        case kKeyProvisioning_Operation_Enroll:
+        {
+            blfwk::CommandPacket cmdPacket(kCommandTag_KeyProvisioning, kCommandFlag_None, m_operation);
+            processResponse(cmdPacket.sendCommandGetResponse(device));
+            break;
+        }
+        case kKeyProvisioning_Operation_SetIntrinsicKey:
+        {
+            blfwk::CommandPacket cmdPacket(kCommandTag_KeyProvisioning, kCommandFlag_None, m_operation, m_type, m_size);
+            processResponse(cmdPacket.sendCommandGetResponse(device));
+            break;
+        }
+        case kKeyProvisioning_Operation_WriteNonVolatile:
+        case kKeyProvisioning_Operation_ReadNonVolatile:
+        {
+            blfwk::CommandPacket cmdPacket(kCommandTag_KeyProvisioning, kCommandFlag_None, m_operation, m_memoryId);
+            processResponse(cmdPacket.sendCommandGetResponse(device));
+            break;
+        }
+        case kKeyProvisioning_Operation_SetUserKey:
+        case kKeyProvisioning_Operation_WriteKeyStore:
+            sendCmdAndData(device);
+            break;
+        case kKeyProvisioning_Operation_ReadKeyStore:
+            sendCmdAndGetData(device);
+            break;
+        default:
+            break;
+    }
+}
+
+void KeyProvisioning::sendCmdAndGetData(Packetizer &device)
+{
+    DataPacket::DataConsumer *dataConsumer;
+    DataPacket::FileDataConsumer fileDataConsumer;
+    DataPacket::StdOutDataConsumer stdoutDataConsumer;
+
+    // Setup to write to file or stdout
+    if (m_fileOrData.size() > 0)
+    {
+        if (!fileDataConsumer.init(m_fileOrData))
+        {
+            return;
+        }
+        dataConsumer = &fileDataConsumer;
+    }
+    else
+    {
+        dataConsumer = &stdoutDataConsumer;
+    }
+
+    // Send command packet.
+    blfwk::CommandPacket cmdPacket(kCommandTag_KeyProvisioning, kCommandFlag_None, m_operation);
+    const uint8_t *responsePacket = cmdPacket.sendCommandGetResponse(device);
+
+    const key_provisioning_response_packet_t *packet =
+        reinterpret_cast<const key_provisioning_response_packet_t *>(responsePacket);
+    uint32_t bytesToRead = m_size;
+    if (processResponse(packet))
+    {
+        bytesToRead = packet->keyByteCount;
+        m_size = bytesToRead;
+        // Receive data packets.
+        blfwk::DataPacket dataPacket(dataConsumer);
+        uint8_t *finalResponsePacket = dataPacket.receiveFrom(device, &bytesToRead, m_progress);
+        processResponse(finalResponsePacket);
+    }
+
+    // Push the number of bytes transferred response value.
+    m_responseValues.push_back(m_size - bytesToRead);
+
+    // Format the command transfer details.
+    m_responseDetails = format_string("Read %d of %d bytes.", m_size - bytesToRead, m_size);
+}
+
+void KeyProvisioning::sendCmdAndData(Packetizer &device)
+{
+    DataPacket::HexDataProducer hexProducer;
+    DataPacket::FileDataProducer fileProducer;
+    DataPacket::DataProducer *dataProducer;
+
+    if ((m_fileOrData[0] == '{') && (m_fileOrData[1] == '{'))
+    {
+        // Argument string is hex data, so use hex data producer.
+        if (hexProducer.initFromString(m_fileOrData) == 0)
+        {
+            return;
+        }
+        dataProducer = &hexProducer;
+    }
+    else
+    {
+        // Argument string is file name, so use file data producer.
+        if (!fileProducer.init(m_fileOrData, m_size))
+        {
+            return;
+        }
+        dataProducer = &fileProducer;
+    }
+
+    // Get target bootloader data packet size.
+    uint32_t packetSizeInBytes;
+    GetProperty getPacketSize(kProperty_MaxPacketSize, 0 /*Not used*/);
+    getPacketSize.sendTo(device);
+    uint32_t fw_status = getPacketSize.getResponseValues()->at(0);
+    if (fw_status != kStatus_Success)
+    {
+        // Failed to get data packet size.
+        Log::warning("Warning: Failed to get packet size. Using default size(%d)", kMinPacketBufferSize);
+        packetSizeInBytes = kMinPacketBufferSize; // No property. Use default packet size.
+    }
+    else
+    {
+        packetSizeInBytes = getPacketSize.getResponseValues()->at(1);
+        if (packetSizeInBytes > device.getMaxPacketSize())
+        {
+            Log::error("Error: Packet size(%d) is bigger than max supported size(%d).", packetSizeInBytes,
+                       kMaxHostPacketSize);
+            return;
+        }
+    }
+
+    // Send command packet.
+    uint32_t bytesToWrite = dataProducer->getDataSize();
+    uint32_t bytesWritten;
+    blfwk::CommandPacket cmdPacket(kCommandTag_KeyProvisioning, kCommandFlag_HasDataPhase, m_operation, m_type,
+                                   bytesToWrite);
+    const uint8_t *responsePacket = cmdPacket.sendCommandGetResponse(device);
+
+    const key_provisioning_response_packet_t *packet =
+        reinterpret_cast<const key_provisioning_response_packet_t *>(responsePacket);
+    if (processResponse(packet))
+    {
+        if (packet->keyByteCount != bytesToWrite)
+        {
+            Log::error("Error: Incorrect key length %d(%#x) which should be %d(%#x), Abort the data phase.", m_size,
+                       m_size, packet->keyByteCount, packet->keyByteCount);
+            uint8_t dummy_data = 0;
+            device.writePacket(&dummy_data, 0, kPacketType_Data);
+            uint8_t *responsePacket = NULL;
+            uint32_t responseLength;
+            if (!device.readPacket(&responsePacket, &responseLength, kPacketType_Command))
+            {
+                processResponse(responsePacket);
+            }
+            return;
+        }
+    }
+    else
+    {
+        m_responseDetails = format_string("Wrote 0 of %d bytes.", bytesToWrite);
+        return;
+    }
+
+    // Pop the initial (successful) generic response value.
+    if (m_responseValues.size())
+    {
+        m_responseValues.pop_back();
+    }
+
+    // Send data packets.
+    blfwk::DataPacket dataPacket(dataProducer, packetSizeInBytes);
+
+    processResponse(dataPacket.sendTo(device, &bytesWritten, m_progress));
+}
+
+bool KeyProvisioning::processResponse(const key_provisioning_response_packet_t *packet)
+{
+    if (!packet)
+    {
+        Log::debug("processResponse: null packet\n");
+        m_responseValues.push_back(kStatus_NoResponse);
+        return false;
+    }
+
+    // Handle generic response, which would be returned if command is not supported.
+    if (packet->commandPacket.commandTag == kCommandTag_GenericResponse)
+    {
+        return processResponse((const uint8_t *)packet);
+    }
+
+    if (packet->commandPacket.commandTag != kCommandTag_KeyProvisioningResponse)
+    {
+        Log::error("Error: expected kCommandTag_KeyProvisioningResponse (0x%x), received 0x%x\n",
+                   kCommandTag_KeyProvisioningResponse, packet->commandPacket.commandTag);
+        return false;
+    }
+    if (packet->status != kStatus_Success)
+    {
+        // Set the status in the response vector.
+        // If status is OK, this push will be done by final response processing
+        m_responseValues.push_back(packet->status);
+        return false;
+    }
+
+    Log::info("Successful response to command '%s'\n", getName().c_str());
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Trust Provisioning command
+////////////////////////////////////////////////////////////////////////////////
+
+// See host_command.h for documentation of this method.
+bool TrustProvisioning::init()
+{
+    if (getArgCount() < 2) // 1 arguement at least.
+    {
+        return false;
+    }
+
+    // Get the operation code.
+    if (!utils::stringtoui(getArg(1), m_operation))
+    {
+        if (strcmp(getArg(1).c_str(), kOperation_Tp_OemGenMasterShare.name) == 0)
+        {
+            m_operation = kOperation_Tp_OemGenMasterShare.tag;
+        }
+        else if (strcmp(getArg(1).c_str(), kOperation_Tp_OemSetMasterShare.name) == 0)
+        {
+            m_operation = kOperation_Tp_OemSetMasterShare.tag;
+        }
+        else if (strcmp(getArg(1).c_str(), kOperation_Tp_OemGetCustCertDicePuk.name) == 0)
+        {
+            m_operation = kOperation_Tp_OemGetCustCertDicePuk.tag;
+        }
+        else if (strcmp(getArg(1).c_str(), kOperation_Tp_HsmGenKey.name) == 0)
+        {
+            m_operation = kOperation_Tp_HsmGenKey.tag;
+        }
+        else if (strcmp(getArg(1).c_str(), kOperation_Tp_HsmStoreKey.name) == 0)
+        {
+            m_operation = kOperation_Tp_HsmStoreKey.tag;
+        }
+        else if (strcmp(getArg(1).c_str(), kOperation_Tp_HsmEncryptBlock.name) == 0)
+        {
+            m_operation = kOperation_Tp_HsmEncryptBlock.tag;
+        }
+        else if (strcmp(getArg(1).c_str(), kOperation_Tp_HsmEncryptSign.name) == 0)
+        {
+            m_operation = kOperation_Tp_HsmEncryptSign.tag;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    switch (m_operation)
+    {
+        /*!< OEM trusted facility commands. */
+        case kTrustProvisioning_Operation_Oem_GenMasterShare:
+            if (getArgCount() != 10)
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(2), m_parms.oemGenMasterShare.oemShareInputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(3), m_parms.oemGenMasterShare.oemShareInputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(4), m_parms.oemGenMasterShare.oemEncShareOutputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(5), m_parms.oemGenMasterShare.oemEncShareOutputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(6), m_parms.oemGenMasterShare.oemEncMasterShareOutputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(7), m_parms.oemGenMasterShare.oemEncMasterShareOutputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(8), m_parms.oemGenMasterShare.oemCustCertPukOutputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(9), m_parms.oemGenMasterShare.oemCustCertPukOutputSize))
+            {
+                return false;
+            }
+            break;
+        case kTrustProvisioning_Operation_Oem_SetMasterShare:
+            if (getArgCount() != 6)
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(2), m_parms.oemSetMasterShare.oemShareInputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(3), m_parms.oemSetMasterShare.oemShareInputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(4), m_parms.oemSetMasterShare.oemEncMasterShareInputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(5), m_parms.oemSetMasterShare.oemEncMasterShareInputSize))
+            {
+                return false;
+            }
+            break;
+        case kTrustProvisioning_Operation_Oem_GetCustCertDicePuk:
+            if (getArgCount() != 6)
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(2), m_parms.oemGetCustCertDicePuk.oemRkthInputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(3), m_parms.oemGetCustCertDicePuk.oemRkthInputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(4), m_parms.oemGetCustCertDicePuk.oemCustCertDicePukOutputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(5), m_parms.oemGetCustCertDicePuk.oemCustCertDicePukOutputSize))
+            {
+                return false;
+            }
+            break;
+        case kTrustProvisioning_Operation_Hsm_GenKey:
+            if (getArgCount() != 8)
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(2), m_parms.hsmGenKey.keyType))
+            {
+                if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmGenKey_MfwIsK.name) == 0)
+                {
+                    m_parms.hsmGenKey.keyType = kKeyType_Tp_HsmGenKey_MfwIsK.tag;
+                }
+                else if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmGenKey_MfwEncK.name) == 0)
+                {
+                    m_parms.hsmGenKey.keyType = kKeyType_Tp_HsmGenKey_MfwEncK.tag;
+                }
+                else if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmGenKey_GenSignK.name) == 0)
+                {
+                    m_parms.hsmGenKey.keyType = kKeyType_Tp_HsmGenKey_GenSignK.tag;
+                }
+                else if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmGenKey_GenCustMkSK.name) == 0)
+                {
+                    m_parms.hsmGenKey.keyType = kKeyType_Tp_HsmGenKey_GenCustMkSK.tag;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            if (!utils::stringtoui(getArg(3), m_parms.hsmGenKey.keyProp))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(4), m_parms.hsmGenKey.keyBlobOutputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(5), m_parms.hsmGenKey.keyBlobOutputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(6), m_parms.hsmGenKey.ecdsaPukOutputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(7), m_parms.hsmGenKey.ecdsaPukOutputSize))
+            {
+                return false;
+            }
+            break;
+        case kTrustProvisioning_Operation_Hsm_StoreKey:
+            if (getArgCount() != 8)
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(2), m_parms.hsmStoreKey.keyType))
+            {
+                if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmStoreKey_CKDFK.name) == 0)
+                {
+                    m_parms.hsmStoreKey.keyType = kKeyType_Tp_HsmStoreKey_CKDFK.tag;
+                }
+                else if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmStoreKey_HKDFK.name) == 0)
+                {
+                    m_parms.hsmStoreKey.keyType = kKeyType_Tp_HsmStoreKey_HKDFK.tag;
+                }
+                else if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmStoreKey_HMACK.name) == 0)
+                {
+                    m_parms.hsmStoreKey.keyType = kKeyType_Tp_HsmStoreKey_HMACK.tag;
+                }
+                else if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmStoreKey_CMACK.name) == 0)
+                {
+                    m_parms.hsmStoreKey.keyType = kKeyType_Tp_HsmStoreKey_CMACK.tag;
+                }
+                else if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmStoreKey_AESK.name) == 0)
+                {
+                    m_parms.hsmStoreKey.keyType = kKeyType_Tp_HsmStoreKey_AESK.tag;
+                }
+                else if (strcmp(getArg(2).c_str(), kKeyType_Tp_HsmStoreKey_KUOK.name) == 0)
+                {
+                    m_parms.hsmStoreKey.keyType = kKeyType_Tp_HsmStoreKey_KUOK.tag;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            if (!utils::stringtoui(getArg(3), m_parms.hsmStoreKey.keyProp))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(4), m_parms.hsmStoreKey.keyInputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(5), m_parms.hsmStoreKey.keyInputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(6), m_parms.hsmStoreKey.keyBlobOutputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(7), m_parms.hsmStoreKey.keyBlobOutputSize))
+            {
+                return false;
+            }
+            break;
+        case kTrustProvisioning_Operation_Hsm_EncryptBlock:
+            if (getArgCount() != 10)
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(2), m_parms.hsmEncBlk.mfgCustMkSk0BlobInputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(3), m_parms.hsmEncBlk.mfgCustMkSk0BlobInputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(4), m_parms.hsmEncBlk.kekId))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(5), m_parms.hsmEncBlk.sb3HeaderInputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(6), m_parms.hsmEncBlk.sb3HeaderInputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(7), m_parms.hsmEncBlk.blockNum))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(8), m_parms.hsmEncBlk.blockDataAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(9), m_parms.hsmEncBlk.blockDataSize))
+            {
+                return false;
+            }
+            break;
+        case kTrustProvisioning_Operation_Hsm_EncryptSign:
+            if (getArgCount() != 8)
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(2), m_parms.hsmEncSign.keyBlobInputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(3), m_parms.hsmEncSign.keyBlobInputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(4), m_parms.hsmEncSign.blockDataInputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(5), m_parms.hsmEncSign.blockDataInputSize))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(6), m_parms.hsmEncSign.signatureOutputAddr))
+            {
+                return false;
+            }
+            if (!utils::stringtoui(getArg(7), m_parms.hsmEncSign.signatureOutputSize))
+            {
+                return false;
+            }
+            break;
+        /*
+         * Not supported yet.
+         */
+        /*!< NXP factory commands. */
+        case kTrustProvisioning_Operation_Nxp_RtsGetId:
+        case kTrustProvisioning_Operation_Nxp_RtsInsertCertificate:
+        case kTrustProvisioning_Operation_Nxp_SsfInsertCertificate:
+        /*!< OEM/CM factory commands. */
+        case kTrustProvisioning_Operation_Dev_AuthChallengeNxp:
+        case kTrustProvisioning_Operation_Dev_AuthChallengeOem:
+        case kTrustProvisioning_Operation_Dev_SetWrapData:
+        /*!< In-field commands. */
+        case kTrustProvisioning_Operation_Dev_GetUuid:
+        default:
+            return false;
+    }
+
+    return true;
+}
+
+// See host_command.h for documentation of this method.
+void TrustProvisioning::sendTo(Packetizer &device)
+{
+    switch (m_operation)
+    {
+        /*!< OEM trusted facility commands. */
+        case kTrustProvisioning_Operation_Oem_GenMasterShare:
+        {
+            blfwk::CommandPacket cmdPacket(
+                kCommandTag_TrustProvisioning, kCommandFlag_None, m_operation,
+                m_parms.oemGenMasterShare.oemShareInputAddr, m_parms.oemGenMasterShare.oemShareInputSize,
+                m_parms.oemGenMasterShare.oemEncShareOutputAddr, m_parms.oemGenMasterShare.oemEncShareOutputSize,
+                m_parms.oemGenMasterShare.oemEncMasterShareOutputAddr,
+                m_parms.oemGenMasterShare.oemEncMasterShareOutputSize,
+                m_parms.oemGenMasterShare.oemCustCertPukOutputAddr, m_parms.oemGenMasterShare.oemCustCertPukOutputSize);
+            processResponse(reinterpret_cast<const trust_provisioning_response_packet_t *>(
+                cmdPacket.sendCommandGetResponse(device)));
+            break;
+        }
+        case kTrustProvisioning_Operation_Oem_SetMasterShare:
+        {
+            blfwk::CommandPacket cmdPacket(kCommandTag_TrustProvisioning, kCommandFlag_None, m_operation,
+                                           m_parms.oemSetMasterShare.oemShareInputAddr,
+                                           m_parms.oemSetMasterShare.oemShareInputSize,
+                                           m_parms.oemSetMasterShare.oemEncMasterShareInputAddr,
+                                           m_parms.oemSetMasterShare.oemEncMasterShareInputSize);
+            processResponse(reinterpret_cast<const trust_provisioning_response_packet_t *>(
+                cmdPacket.sendCommandGetResponse(device)));
+            break;
+        }
+        case kTrustProvisioning_Operation_Oem_GetCustCertDicePuk:
+        {
+            blfwk::CommandPacket cmdPacket(kCommandTag_TrustProvisioning, kCommandFlag_None, m_operation,
+                                           m_parms.oemGetCustCertDicePuk.oemRkthInputAddr,
+                                           m_parms.oemGetCustCertDicePuk.oemRkthInputSize,
+                                           m_parms.oemGetCustCertDicePuk.oemCustCertDicePukOutputAddr,
+                                           m_parms.oemGetCustCertDicePuk.oemCustCertDicePukOutputSize);
+            processResponse(reinterpret_cast<const trust_provisioning_response_packet_t *>(
+                cmdPacket.sendCommandGetResponse(device)));
+            break;
+        }
+        case kTrustProvisioning_Operation_Hsm_GenKey:
+        {
+            blfwk::CommandPacket cmdPacket(kCommandTag_TrustProvisioning, kCommandFlag_None, m_operation,
+                                           m_parms.hsmGenKey.keyType, m_parms.hsmGenKey.keyProp,
+                                           m_parms.hsmGenKey.keyBlobOutputAddr, m_parms.hsmGenKey.keyBlobOutputSize,
+                                           m_parms.hsmGenKey.ecdsaPukOutputAddr, m_parms.hsmGenKey.ecdsaPukOutputSize);
+            processResponse(reinterpret_cast<const trust_provisioning_response_packet_t *>(
+                cmdPacket.sendCommandGetResponse(device)));
+            break;
+        }
+        case kTrustProvisioning_Operation_Hsm_StoreKey:
+        {
+            blfwk::CommandPacket cmdPacket(
+                kCommandTag_TrustProvisioning, kCommandFlag_None, m_operation, m_parms.hsmStoreKey.keyType,
+                m_parms.hsmStoreKey.keyProp, m_parms.hsmStoreKey.keyInputAddr, m_parms.hsmStoreKey.keyInputSize,
+                m_parms.hsmStoreKey.keyBlobOutputAddr, m_parms.hsmStoreKey.keyBlobOutputSize);
+            processResponse(reinterpret_cast<const trust_provisioning_response_packet_t *>(
+                cmdPacket.sendCommandGetResponse(device)));
+            break;
+        }
+        case kTrustProvisioning_Operation_Hsm_EncryptBlock:
+        {
+            blfwk::CommandPacket cmdPacket(
+                kCommandTag_TrustProvisioning, kCommandFlag_None, m_operation,
+                m_parms.hsmEncBlk.mfgCustMkSk0BlobInputAddr, m_parms.hsmEncBlk.mfgCustMkSk0BlobInputSize,
+                m_parms.hsmEncBlk.kekId, m_parms.hsmEncBlk.sb3HeaderInputAddr, m_parms.hsmEncBlk.sb3HeaderInputSize,
+                m_parms.hsmEncBlk.blockNum, m_parms.hsmEncBlk.blockDataAddr, m_parms.hsmEncBlk.blockDataSize);
+            processResponse(reinterpret_cast<const trust_provisioning_response_packet_t *>(
+                cmdPacket.sendCommandGetResponse(device)));
+            break;
+        }
+        case kTrustProvisioning_Operation_Hsm_EncryptSign:
+        {
+            blfwk::CommandPacket cmdPacket(kCommandTag_TrustProvisioning, kCommandFlag_None, m_operation,
+                                           m_parms.hsmEncSign.keyBlobInputAddr, m_parms.hsmEncSign.keyBlobInputSize,
+                                           m_parms.hsmEncSign.blockDataInputAddr, m_parms.hsmEncSign.blockDataInputSize,
+                                           m_parms.hsmEncSign.signatureOutputAddr,
+                                           m_parms.hsmEncSign.signatureOutputSize);
+            processResponse(reinterpret_cast<const trust_provisioning_response_packet_t *>(
+                cmdPacket.sendCommandGetResponse(device)));
+            break;
+        }
+        /*
+         * Not supported yet.
+         */
+        /*!< NXP factory commands. */
+        case kTrustProvisioning_Operation_Nxp_RtsGetId:
+        case kTrustProvisioning_Operation_Nxp_RtsInsertCertificate:
+        case kTrustProvisioning_Operation_Nxp_SsfInsertCertificate:
+        /*!< OEM/CM factory commands. */
+        case kTrustProvisioning_Operation_Dev_AuthChallengeNxp:
+        case kTrustProvisioning_Operation_Dev_AuthChallengeOem:
+        case kTrustProvisioning_Operation_Dev_SetWrapData:
+        /*!< In-field commands. */
+        case kTrustProvisioning_Operation_Dev_GetUuid:
+        default:
+            break;
+    }
+}
+
+bool TrustProvisioning::processResponse(const trust_provisioning_response_packet_t *packet)
+{
+    if (!packet)
+    {
+        Log::debug("processResponse: null packet\n");
+        m_responseValues.push_back(kStatus_NoResponse);
+        return false;
+    }
+
+    // Handle generic response, which would be returned if command is not supported.
+    if (packet->commandPacket.commandTag == kCommandTag_GenericResponse)
+    {
+        return processResponse((const uint8_t *)packet);
+    }
+
+    if (packet->commandPacket.commandTag != kCommandTag_TrustProvisioningResponse)
+    {
+        Log::error("Error: expected kCommandTag_TrustProvisioningResponse (0x%x), received 0x%x\n",
+                   kCommandTag_TrustProvisioningResponse, packet->commandPacket.commandTag);
+        return false;
+    }
+
+    // Set the status in the response vector.
+    m_responseValues.push_back(packet->status);
+
+    // All operation responses have at least one response word.
+    // Attention: parameterCount = 1(response status) + response words
+    for (uint8_t i = 0; i < (packet->commandPacket.parameterCount - 1); ++i)
+    {
+        m_responseValues.push_back(packet->returnValue[i]);
+    }
+
+    if ((packet->status == kStatus_InvalidArgument) || (packet->status == kStatus_Success))
+    {
+        if (packet->status == kStatus_Success)
+        {
+            m_responseDetails = format_string("Output data size/value(s) is(are):\n");
+        }
+        else
+        {
+            m_responseDetails =
+                format_string("Output buffer(s) is(are) smaller than the minimum requested which is(are):\n");
+        }
+        switch (m_operation)
+        {
+            /*!< OEM trusted facility commands. */
+            case kTrustProvisioning_Operation_Oem_GenMasterShare:
+            {
+                if (m_responseValues.size() != 4)
+                {
+                    Log::error("Error: expected %d arguments, received %d\n", 4, m_responseValues.size());
+                    m_responseDetails.clear();
+                }
+                else
+                {
+                    m_responseDetails += format_string(
+                        "\tOEM Share size: %d(%#x)\n\tOEM Master Share size: %d(%#x)\n\tCust Cert Puk size: %d(%#x)",
+                        m_responseValues.at(1), m_responseValues.at(1), m_responseValues.at(2), m_responseValues.at(2),
+                        m_responseValues.at(3), m_responseValues.at(3));
+                }
+                break;
+            }
+            case kTrustProvisioning_Operation_Oem_SetMasterShare:
+            {
+                /* No response value. */
+                m_responseDetails.clear();
+                break;
+            }
+            case kTrustProvisioning_Operation_Oem_GetCustCertDicePuk:
+            {
+                if (m_responseValues.size() != 2)
+                {
+                    Log::error("Error: expected %d arguments, received %d\n", 4, m_responseValues.size());
+                    m_responseDetails.clear();
+                }
+                else
+                {
+                    m_responseDetails += format_string("\tCust Cert Dice Puk size: %d(%#x)", m_responseValues.at(1),
+                                                       m_responseValues.at(1));
+                }
+                break;
+            }
+            case kTrustProvisioning_Operation_Hsm_GenKey:
+            {
+                if (m_responseValues.size() != 3)
+                {
+                    Log::error("Error: expected %d arguments, received %d\n", 4, m_responseValues.size());
+                    m_responseDetails.clear();
+                }
+                else
+                {
+                    m_responseDetails +=
+                        format_string("\tKey Blob size: %d(%#x)\n\tECDSA Puk size: %d(%#x)", m_responseValues.at(1),
+                                      m_responseValues.at(1), m_responseValues.at(2), m_responseValues.at(2));
+                }
+                break;
+            }
+            case kTrustProvisioning_Operation_Hsm_StoreKey:
+            {
+                if (m_responseValues.size() != 3)
+                {
+                    Log::error("Error: expected %d arguments, received %d\n", 4, m_responseValues.size());
+                    m_responseDetails.clear();
+                }
+                else
+                {
+                    m_responseDetails +=
+                        format_string("\tKey Header: %d(%#x)\n\tKey Blob size: %d(%#x)", m_responseValues.at(1),
+                                      m_responseValues.at(1), m_responseValues.at(2), m_responseValues.at(2));
+                }
+                break;
+            }
+            case kTrustProvisioning_Operation_Hsm_EncryptBlock:
+            {
+                /* No response value. */
+                m_responseDetails.clear();
+                break;
+            }
+            case kTrustProvisioning_Operation_Hsm_EncryptSign:
+            {
+                if (m_responseValues.size() != 2)
+                {
+                    Log::error("Error: expected %d arguments, received %d\n", 4, m_responseValues.size());
+                    m_responseDetails.clear();
+                }
+                else
+                {
+                    m_responseDetails +=
+                        format_string("\tSignature size: %d(%#x)", m_responseValues.at(1), m_responseValues.at(1));
+                }
+                break;
+            }
+            /*
+             * Not supported yet.
+             */
+            /*!< NXP factory commands. */
+            case kTrustProvisioning_Operation_Nxp_RtsGetId:
+            case kTrustProvisioning_Operation_Nxp_RtsInsertCertificate:
+            case kTrustProvisioning_Operation_Nxp_SsfInsertCertificate:
+            /*!< OEM/CM factory commands. */
+            case kTrustProvisioning_Operation_Dev_AuthChallengeNxp:
+            case kTrustProvisioning_Operation_Dev_AuthChallengeOem:
+            case kTrustProvisioning_Operation_Dev_SetWrapData:
+            /*!< In-field commands. */
+            case kTrustProvisioning_Operation_Dev_GetUuid:
+            default:
+                break;
+        }
+    }
+
+    if (packet->status != kStatus_Success)
+    {
+        return false;
+    }
+
+    Log::info("Successful response to command '%s'\n", getName().c_str());
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // FlashImage command
 ////////////////////////////////////////////////////////////////////////////////
 
 // See host_command.h for documentation of this method.
 bool FlashImage::init()
 {
-    if (getArgCount() != 2 && getArgCount() != 3)
+    if (getArgCount() != 2 && getArgCount() != 3 && getArgCount() != 4)
     {
         return false;
     }
@@ -1900,17 +3960,58 @@ bool FlashImage::init()
     if (getArgCount() == 3)
     {
         string strDoEraseOpt = getArg(2);
-        if (strDoEraseOpt == "erase" || strDoEraseOpt == "1")
+        if (strDoEraseOpt == "erase")
+        {
+            m_doEraseOpt = true;
+            m_memoryId = kMemoryInternal;
+        }
+        else if (strDoEraseOpt == "none")
+        {
+            m_doEraseOpt = false;
+            m_memoryId = kMemoryInternal;
+        }
+        else
+        {
+            // If not 'erase' or 'none'. Try to parse it as memoryId
+            // If arg2 is a valid number, it is valid memoryId,
+            // otherwise is invalid arg and return false.
+            if (!utils::stringtoui(getArg(2), m_memoryId))
+            {
+                return false;
+            }
+            // Use 0 for flashing image to internal 4G memory including mapped memory, such as QSPI
+            if (GROUPID(m_memoryId) == kGroup_Internal)
+            {
+                m_memoryId = kMemoryInternal;
+            }
+            // NO erase operation by default.
+            m_doEraseOpt = false;
+        }
+    }
+    else if (getArgCount() == 4)
+    {
+        string strDoEraseOpt = getArg(2);
+        if (strDoEraseOpt == "erase")
         {
             m_doEraseOpt = true;
         }
-        else if (strDoEraseOpt == "none" || strDoEraseOpt == "0")
+        else if (strDoEraseOpt == "none")
         {
             m_doEraseOpt = false;
         }
         else
         {
             return false;
+        }
+
+        if (!utils::stringtoui(getArg(3), m_memoryId))
+        {
+            return false;
+        }
+        // Use 0 for flashing image to internal 4G memory including mapped memory, such as QSPI
+        if (GROUPID(m_memoryId) == kGroup_Internal)
+        {
+            m_memoryId = kMemoryInternal;
         }
     }
 
@@ -1945,27 +4046,18 @@ void FlashImage::sendTo(Packetizer &device)
 
     if (m_doEraseOpt)
     {
-        GetProperty cmdGetSectorSize(kProperty_FlashSectorSize);
-        cmdGetSectorSize.sendTo(device);
-        // Print and check the command response values.
-        fw_status = cmdGetSectorSize.getResponseValues()->at(0);
-        if (fw_status != kStatus_Success)
-        {
-            m_responseValues.push_back(fw_status);
-            delete dataSource;
-            return;
-        }
-        m_sectorSize = cmdGetSectorSize.getResponseValues()->at(1);
-
         for (uint32_t index = 0; index < dataSource->getSegmentCount(); ++index)
         {
             DataSource::Segment *segment = dataSource->getSegmentAt(index);
 
             // Align the start address and length to a sector boundary
-            uint32_t alignedStart = segment->getBaseAddress() & (~(m_sectorSize - 1));
-            uint32_t alignedLength = (segment->getLength() + m_sectorSize) & (~(m_sectorSize - 1));
+            uint32_t alignedStart = segment->getBaseAddress() & (~(MinEraseAlignment - 1));
+            uint32_t alignedLength =
+                ((segment->getBaseAddress() + segment->getLength() + MinEraseAlignment) & (~(MinEraseAlignment - 1))) -
+                alignedStart;
+
             // Do erase operation to erase the necessary flash.
-            FlashEraseRegion cmd(alignedStart, alignedLength);
+            FlashEraseRegion cmd(alignedStart, alignedLength, m_memoryId);
             cmd.sendTo(device);
 
             // Print and check the command response values.
@@ -1985,7 +4077,7 @@ void FlashImage::sendTo(Packetizer &device)
 
         // Write the file to the base address.
         Log::info("Wrote %d bytes to address %#x\n", segment->getLength(), segment->getBaseAddress());
-        WriteMemory cmd(segment);
+        WriteMemory cmd(segment, m_memoryId);
 
         m_progress->m_segmentIndex = index + 1;
         cmd.registerProgress(m_progress);
@@ -2125,6 +4217,277 @@ void ConfigureCan::sendTo(Packetizer &device)
 {
     blfwk::CommandPacket cmdPacket(kCommandTag_ConfigureCan, kCommandFlag_None, canSpeed, canTxid, canRxid);
     processResponse(cmdPacket.sendCommandGetResponse(device));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ListMemory command
+////////////////////////////////////////////////////////////////////////////////
+
+// See host_command.h for documentation of this method.
+bool ListMemory::init()
+{
+    if (getArgCount() != 1)
+    {
+        return false;
+    }
+    return true;
+}
+
+// See host_command.h for documentation of this method.
+void ListMemory::sendTo(Packetizer &device)
+{
+    uint32_t fw_status;
+    uint32_t firstStartAddress = 0;
+
+    // List internal on-chip FLASH regions.
+    Log::info("Internal Flash:\n");
+    for (uint32_t index = 0;; index++)
+    {
+        // Get internal on-chip FLASH start address.
+        uint32_t startAddress;
+        GetProperty getFlashStartAddress(kProperty_FlashStartAddress, index);
+        getFlashStartAddress.sendTo(device);
+        fw_status = getFlashStartAddress.getResponseValues()->at(0);
+        if (fw_status == kStatus_UnknownProperty)
+        {
+            // UnknownProperty means that there is no internal flash on current device.
+            Log::info("  No Internal Flash available\n");
+            break;
+        }
+        else if (fw_status != kStatus_Success)
+        {
+            // Failed to communicate with the device.
+            m_responseValues.push_back(fw_status);
+            return;
+        }
+        startAddress = getFlashStartAddress.getResponseValues()->at(1);
+
+        if (index == 0)
+        {
+            firstStartAddress = startAddress;
+        }
+        else if (startAddress == firstStartAddress)
+        {
+            // If a flash region's start address is the same as the first region.
+            // That means all flash regions are listed.
+            // Then break the for-loop.
+            break;
+        }
+
+        // Get internal on-chip FLASH size.
+        uint32_t flashSize;
+        GetProperty getFlashSize(kProperty_FlashSizeInBytes, index);
+        getFlashSize.sendTo(device);
+        fw_status = getFlashSize.getResponseValues()->at(0);
+        if (fw_status != kStatus_Success)
+        {
+            // Failed to communicate with the device.
+            m_responseValues.push_back(fw_status);
+            return;
+        }
+        flashSize = getFlashSize.getResponseValues()->at(1);
+
+        // Get internal on-chip FLASH sector size.
+        uint32_t sectorSize;
+        GetProperty getFlashSectorSize(kProperty_FlashSectorSize, index);
+        getFlashSectorSize.sendTo(device);
+        fw_status = getFlashSectorSize.getResponseValues()->at(0);
+        if (fw_status != kStatus_Success)
+        {
+            // Failed to communicate with the device.
+            m_responseValues.push_back(fw_status);
+            return;
+        }
+        sectorSize = getFlashSectorSize.getResponseValues()->at(1);
+
+        Log::info("  Region %d: 0x%08x - 0x%08x; Total size: %s  Sector size: %s\n", index, startAddress,
+                  startAddress + flashSize - 1, utils::scale_bytes(flashSize).c_str(),
+                  utils::scale_bytes(sectorSize).c_str());
+    }
+
+    // List internal on-chip RAM regions.
+    Log::info("Internal RAM:\n");
+    for (uint32_t index = 0;; index++)
+    {
+        uint32_t startAddress;
+        // Get internal on-chip RAM start address.
+        GetProperty getRamStartAddress(kProperty_RAMStartAddress, index);
+        getRamStartAddress.sendTo(device);
+        fw_status = getRamStartAddress.getResponseValues()->at(0);
+        if (fw_status == kStatus_UnknownProperty)
+        {
+            // UnknownProperty means that there is no internal ram on current device.
+            Log::info("  No Internal RAM available\n");
+            break;
+        }
+        if (fw_status != kStatus_Success)
+        {
+            // Failed to communicate with the device.
+            m_responseValues.push_back(fw_status);
+            return;
+        }
+        startAddress = getRamStartAddress.getResponseValues()->at(1);
+
+        if (index == 0)
+        {
+            firstStartAddress = startAddress;
+        }
+        else if (startAddress == firstStartAddress)
+        {
+            // If a RAM region's start address is the same as the first region.
+            // That means all RAM regions are listed.
+            // Then break the for-loop.
+            break;
+        }
+
+        uint32_t ramSize;
+        GetProperty getRamSize(kProperty_RAMSizeInBytes, index);
+        getRamSize.sendTo(device);
+        fw_status = getRamSize.getResponseValues()->at(0);
+        if (fw_status != kStatus_Success)
+        {
+            // Failed to communicate with the device.
+            m_responseValues.push_back(fw_status);
+            return;
+        }
+
+        ramSize = getRamSize.getResponseValues()->at(1);
+
+        Log::info("  Region %d: 0x%08x - 0x%08x; Total size: %s\n", index, startAddress, startAddress + ramSize - 1,
+                  utils::scale_bytes(ramSize).c_str());
+    }
+
+    // List external memories.
+    // Inject the get-property command to get the target version.
+    GetProperty getVersion(kProperty_CurrentVersion);
+    getVersion.sendTo(device);
+    fw_status = getVersion.getResponseValues()->at(0);
+    // Check the command status
+    if (fw_status != kStatus_Success)
+    {
+        m_responseValues.push_back(fw_status);
+        return;
+    }
+    uint32_t version = getVersion.getResponseValues()->at(1);
+    version = version & 0x00FFFFFF; // Mask the char 'K'
+
+    // Bootloader 2.0.0 and previous versions only support internal and QSPI0.
+    if (version <= 0x20000 /*KBL2.0.0*/)
+    {
+        GetProperty getQspi(kProperty_ExernalMemoryAttributes, kMemory_QuadSpi.memoryId);
+        getQspi.sendTo(device);
+        fw_status = getQspi.getResponseValues()->at(0);
+        if (fw_status == kStatus_UnknownProperty)
+        {
+            // UnknownProperty means that no external memories are supported by current device.
+        }
+        else if (fw_status == kStatus_InvalidArgument)
+        {
+            // QSPI0 is not supported.
+        }
+        else if (fw_status == 405 /*kStatus_QspiNotConfigured*/)
+        {
+            Log::info("%s:\n  %s\n", kMemory_QuadSpi.description, getStatusMessage(fw_status).c_str());
+        }
+        else if (fw_status != kStatus_Success)
+        {
+            // Failed to get property of the device memory.
+            m_responseValues.push_back(fw_status);
+            return;
+        }
+        else // fw_status == kStatus_Success
+        {
+            uint32_t propertyTags = getQspi.getResponseValues()->at(1);
+            Log::info("%s:\n", kMemory_QuadSpi.description);
+            if (propertyTags & (1 << (kExternalMemoryPropertyTag_StartAddress - 1)))
+            {
+                Log::info("  Start Address = 0x%08x", getQspi.getResponseValues()->at(2));
+            }
+            if (propertyTags & (1 << (kExternalMemoryPropertyTag_MemorySizeInKbytes - 1)))
+            {
+                Log::info("  Total Size = %s", utils::scale_bytes(getQspi.getResponseValues()->at(3) * 1024).c_str());
+            }
+            if (propertyTags & (1 << (kExternalMemoryPropertyTag_PageSize - 1)))
+            {
+                Log::info("  Page Size = %s", utils::scale_bytes(getQspi.getResponseValues()->at(4)).c_str());
+            }
+            if (propertyTags & (1 << (kExternalMemoryPropertyTag_SectorSize - 1)))
+            {
+                Log::info("  Sector Size = %s", utils::scale_bytes(getQspi.getResponseValues()->at(5)).c_str());
+            }
+            if (propertyTags & (1 << (kExternalMemoryPropertyTag_BlockSize - 1)))
+            {
+                Log::info("  Block Size = %s", utils::scale_bytes(getQspi.getResponseValues()->at(6)).c_str());
+            }
+            Log::info("\n");
+        }
+    }
+    else
+    {
+        for (MemoryArray::const_iterator it = kMemories.begin(); it != kMemories.end(); ++it)
+        {
+            GetProperty getExernalAttri(kProperty_ExernalMemoryAttributes, it->memoryId);
+            getExernalAttri.sendTo(device);
+            fw_status = getExernalAttri.getResponseValues()->at(0);
+            if (fw_status == kStatus_UnknownProperty)
+            {
+                // UnknownProperty means that no external memories are supported by current device.
+                break;
+            }
+            else if (fw_status == kStatus_InvalidArgument)
+            {
+                // Current memory type is not supported by the device, skip to next external memory.
+                continue;
+            }
+            // Only un-configured QSPI will return this status.
+            else if (fw_status == 405 /*kStatus_QspiNotConfigured*/)
+            {
+                Log::info("%s:\n  %s\n", it->description, getStatusMessage(fw_status).c_str());
+                continue;
+            }
+            // Other un-configured external memory will return this status.
+            else if (fw_status == kStatusMemoryNotConfigured)
+            {
+                Log::info("%s:\n  %s\n", it->description, getStatusMessage(fw_status).c_str());
+                continue;
+            }
+            else if (fw_status != kStatus_Success)
+            {
+                // Failed to get property of the device memory.
+                m_responseValues.push_back(fw_status);
+                return;
+            }
+            else // fw_status == kStatus_Success
+            {
+                uint32_t propertyTags = getExernalAttri.getResponseValues()->at(1);
+                Log::info("%s:\n", it->description);
+                if (propertyTags & (1 << (kExternalMemoryPropertyTag_StartAddress - 1)))
+                {
+                    Log::info("  Start Address = 0x%08x", getExernalAttri.getResponseValues()->at(2));
+                }
+                if (propertyTags & (1 << (kExternalMemoryPropertyTag_MemorySizeInKbytes - 1)))
+                {
+                    Log::info("  Total Size = %s",
+                              utils::scale_bytes(getExernalAttri.getResponseValues()->at(3) * 1024).c_str());
+                }
+                if (propertyTags & (1 << (kExternalMemoryPropertyTag_PageSize - 1)))
+                {
+                    Log::info("  Page Size = %s",
+                              utils::scale_bytes(getExernalAttri.getResponseValues()->at(4)).c_str());
+                }
+                if (propertyTags & (1 << (kExternalMemoryPropertyTag_SectorSize - 1)))
+                {
+                    Log::info("  Sector Size = %s",
+                              utils::scale_bytes(getExernalAttri.getResponseValues()->at(5)).c_str());
+                }
+                if (propertyTags & (1 << (kExternalMemoryPropertyTag_BlockSize - 1)))
+                {
+                    Log::info("  Block Size = %s",
+                              utils::scale_bytes(getExernalAttri.getResponseValues()->at(6)).c_str());
+                }
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

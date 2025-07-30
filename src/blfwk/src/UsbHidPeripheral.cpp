@@ -1,31 +1,10 @@
 /*
- * Copyright (c) 2013-14, Freescale Semiconductor, Inc.
+ * Copyright (c) 2013-2014 Freescale Semiconductor, Inc.
+ * Copyright 2019 NXP
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
  *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include "blfwk/UsbHidPeripheral.h"
@@ -45,6 +24,7 @@ using namespace blfwk;
 UsbHidPeripheral::UsbHidPeripheral()
     : m_vendor_id(kDefault_Vid)
     , m_product_id(kDefault_Pid)
+    , m_path("")
 {
     if (!init())
     {
@@ -55,9 +35,13 @@ UsbHidPeripheral::UsbHidPeripheral()
 }
 
 // See UsbHidPeripheral.h for documentation of this method.
-UsbHidPeripheral::UsbHidPeripheral(unsigned short vendor_id, unsigned short product_id, const char *serial_number)
+UsbHidPeripheral::UsbHidPeripheral(unsigned short vendor_id,
+                                   unsigned short product_id,
+                                   const char *serial_number,
+                                   const char *path)
     : m_vendor_id(vendor_id)
     , m_product_id(product_id)
+    , m_path(path)
 {
     // Convert to a wchar_t*
     std::string s(serial_number);
@@ -65,9 +49,17 @@ UsbHidPeripheral::UsbHidPeripheral(unsigned short vendor_id, unsigned short prod
 
     if (!init())
     {
-        throw std::runtime_error(
-            format_string("Error: UsbHidPeripheral() cannot open USB HID device (vid=0x%04x, pid=0x%04x, sn=%s).",
-                          vendor_id, product_id, s.c_str()));
+        if (m_path.empty())
+        {
+            throw std::runtime_error(
+                format_string("Error: UsbHidPeripheral() cannot open USB HID device (vid=0x%04x, pid=0x%04x, sn=%s).",
+                              vendor_id, product_id, s.c_str()));
+        }
+        else
+        {
+            throw std::runtime_error(
+                format_string("Error: UsbHidPeripheral() cannot open USB HID device (path=%s).", m_path.c_str()));
+        }
     }
 }
 
@@ -76,7 +68,39 @@ bool UsbHidPeripheral::init()
 {
     // Open the device using the VID, PID,
     // and optionally the Serial number.
-    m_device = hid_open(m_vendor_id, m_product_id, m_serial_number.c_str());
+    if (m_path.empty())
+    {
+        m_device = hid_open(m_vendor_id, m_product_id, m_serial_number.c_str());
+    }
+    else
+    {
+        std::string path = m_path;
+#if defined(WIN32)
+        // if not start with string "\\\\.\\", then add it.
+        if ((path.find("\\\\.\\") != 0) && (path.find("\\\\?\\") != 0))
+        {
+            // Add the prefix string.
+            path = "\\\\.\\" + path;
+        }
+
+        // Replace all '\\' with '#', except the 4 prefix characters.
+        while (path.find('\\', 4) != std::string::npos)
+        {
+            path.replace(path.find('\\', 4), 1, "#");
+        }
+
+        // if not end with string "#{4d1e55b2-f16f-11cf-88cb-001111000030}", then add it.
+        if (path.find("#{4d1e55b2-f16f-11cf-88cb-001111000030}") !=
+            (path.length() - sizeof("#{4d1e55b2-f16f-11cf-88cb-001111000030}") + 1 /*Add line terminator back*/))
+        {
+            path.append("#{4d1e55b2-f16f-11cf-88cb-001111000030}");
+        }
+#endif
+#if _DEBUG
+        Log::info("USB Device Path = %s.\n", path.c_str());
+#endif
+        m_device = hid_open_path(path.c_str());
+    }
     if (!m_device)
     {
         return false;
@@ -160,11 +184,7 @@ status_t UsbHidPeripheral::write(const uint8_t *buffer, uint32_t byteCount, uint
         Log::debug2("]\n");
     }
 
-#ifdef LINUX
-    int count = hid_write(m_device, buffer, byteCount);
-#else
     int count = hid_write_timeout(m_device, buffer, byteCount, timeoutMS);
-#endif
     if (count < 0)
     {
         const wchar_t *errorMessage = hid_error(m_device);
