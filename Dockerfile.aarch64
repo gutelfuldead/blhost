@@ -19,7 +19,7 @@ WORKDIR /lauszus-blhost
 COPY . .
 
 # Build the blhost binary
-RUN make -C validation/blhost/gcc -j1 && \
+RUN make -C validation/blhost/gcc -j$(nproc) && \
     strip validation/blhost/gcc/Release/blhost
 
 # Default shell (interactive or CMD fallback)
