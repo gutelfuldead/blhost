@@ -36,7 +36,7 @@ jobs:
 
       - name: Copy blhost binary from container
         run: |
-          docker cp extract:/blhost/tools/blhost/gcc/Release/blhost ./blhost-aarch64
+          docker cp extract:/blhost-aarch64/tools/blhost/gcc/Release/blhost ./blhost-aarch64
           docker rm extract
 
       - name: Upload blhost binary as artifact
