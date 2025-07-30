@@ -16,5 +16,6 @@ I have also developed a Python version, which supports uploading via serial and 
 * Ping 3 times with a delay of 1 s between the ping commands
 * Allow to set a custom UART baudrate
 * Fixed "get_string_property_utf8" on Mac thanks to Andrew Pines
+* Add Aarch64 workflow build
 
 The executables are automatically build using [Travis](https://travis-ci.org/) and [AppVeyor](https://www.appveyor.com/) for all major platforms including armv7l (Raspberry PI or similar). The executables can be found under the releases tab: <https://github.com/Lauszus/blhost/releases>.
