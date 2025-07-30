@@ -1,15 +1,43 @@
-FROM balenalib/aarch64-debian:latest
+FROM arm64v8/debian:bullseye
 
-COPY . /lauszus-blhost
+# Install build dependencies and a usable shell
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        libudev-dev \
+        bash \
+        ca-certificates \
+        make \
+        file \
+        binutils \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN [ "cross-build-start" ]
+# Set working directory
+WORKDIR /lauszus-blhost
 
-RUN apt-get update
-RUN apt-get install -y apt-utils
-RUN apt-get install -y build-essential libudev-dev
-RUN apt-get install -y libstdc++6
+# Copy blhost source into container
+COPY . .
 
-RUN make -j$(nproc) -C /lauszus-blhost/validation/blhost/gcc
-RUN strip /lauszus-blhost/validation/blhost/gcc/Release/blhost
+# Build the blhost binary
+RUN make -C validation/blhost/gcc -j1 && \
+    strip validation/blhost/gcc/Release/blhost
 
-RUN [ "cross-build-end" ]
+# Default shell (interactive or CMD fallback)
+ENTRYPOINT ["/bin/bash"]
+
+# FROM balenalib/aarch64-debian:latest
+
+# COPY . /lauszus-blhost
+
+# RUN [ "cross-build-start" ]
+
+# RUN apt-get update
+# RUN apt-get install -y apt-utils
+# RUN apt-get install -y build-essential libudev-dev
+# RUN apt-get install -y libstdc++6
+
+# RUN make -j$(nproc) -C /lauszus-blhost/validation/blhost/gcc
+# RUN strip /lauszus-blhost/validation/blhost/gcc/Release/blhost
+
+# RUN [ "cross-build-end" ]
+# ENTRYPOINT ["/bin/bash"]
