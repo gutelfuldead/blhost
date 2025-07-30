@@ -27,9 +27,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      - name: Log in to Docker Hub (optional)
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
-        if: secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN
+        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -40,13 +40,13 @@ jobs:
           context: .
           file: Dockerfile.aarch64
           platforms: linux/arm64
-          push: ${{ secrets.DOCKERHUB_USERNAME != null }}
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/blhost:aarch64
+          push: ${{ secrets.DOCKERHUB_USERNAME != '' }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/blhost:aarch64', secrets.DOCKERHUB_USERNAME) || 'blhost:aarch64' }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
 
       - name: Move cache (persist between builds)
         run: |
           rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cach
 
