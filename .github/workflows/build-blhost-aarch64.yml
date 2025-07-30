@@ -34,8 +34,8 @@ jobs:
         run: |
           docker create --platform linux/arm64 --name extract blhost:aarch64
 
-	  - name: Find compiled binary path (debug)
-		run: |
+      - name: Find compiled binary path (debug)
+        run: |
 		  docker run --rm --platform linux/arm64 blhost:aarch64 find /lauszus-blhost -type f -name 'blhost' -exec ls -lh {} \;
 
       - name: Copy blhost binary from container
