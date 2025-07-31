@@ -1,5 +1,5 @@
 # blhost
 
-NXP Tool blhost
+Cross compiling [NXP Tool blhost](https://www.nxp.com/docs/en/user-guide/MCUBLHOSTUG.pdf) for arm64.
 
-Cross compile for Aarch64 on tool version 2.6.7
+Currently on version 2.6.7.
